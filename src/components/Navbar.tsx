@@ -1,14 +1,14 @@
 import type { JSX } from "react";
 
 /**
- * Ring with a bite taken out on the left, drawn as a single open arc.
- * There is no line back to the center, so the mouth is a clean gap
- * instead of a pair of spokes crossing the middle of the ring.
+ * Solid disc with a wedge cut out of the right side, matching the
+ * favicon. Filled (not stroked), so the "L 32 32 Z" segment is what
+ * correctly closes the mouth wedge rather than showing as a stray line.
  */
 function PacLogo(): JSX.Element {
   return (
     <svg viewBox="0 0 64 64" className="brand-mark" aria-hidden="true">
-      <path d="M 11.52 46.34 A 25 25 0 1 1 11.52 17.66" />
+      <path d="M 52.48 46.34 A 25 25 0 1 1 52.48 17.66 L 32 32 Z" />
     </svg>
   );
 }
