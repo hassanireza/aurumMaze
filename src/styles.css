@@ -83,15 +83,11 @@ button {
 }
 
 .brand-mark {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
-  fill: none;
-  stroke: var(--gold);
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  overflow: visible;
+  fill: var(--gold);
+  stroke: none;
 }
 
 svg {
