@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 // https://<user>.github.io/AurumMaze/ — the base path must match.
 export default defineConfig({
   plugins: [react()],
-  base: "/AurumMaze/",
+  base: "/aurumMaze/",
   build: {
     outDir: "dist",
     sourcemap: false
