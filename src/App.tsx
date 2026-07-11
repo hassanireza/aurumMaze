@@ -4,6 +4,7 @@ import { Hud } from "./components/Hud";
 import { Overlay } from "./components/Overlay";
 import { TouchControls } from "./components/TouchControls";
 import { MobileControls } from "./components/MobileControls";
+import { MobileActionBar } from "./components/MobileActionBar";
 import { LevelPanel } from "./components/LevelPanel";
 import { GameCanvas } from "./components/GameCanvas";
 import type { GameEngine } from "./game/GameEngine";
@@ -71,7 +72,7 @@ export function App(): JSX.Element {
 
         <div className="board-wrap">
           <GameCanvas onHudChange={handleHudChange} onOverlay={handleOverlay} engineRef={engineRef} />
-          <MobileControls onDirection={handleDirection} onPause={handlePause} onRestart={handleRestart} />
+          <MobileControls onDirection={handleDirection} />
           <Overlay
             visible={overlay.visible}
             title={overlay.title}
@@ -81,6 +82,7 @@ export function App(): JSX.Element {
           />
         </div>
 
+        <MobileActionBar onPause={handlePause} onRestart={handleRestart} />
         <TouchControls onDirection={handleDirection} onPause={handlePause} onRestart={handleRestart} />
       </section>
 
