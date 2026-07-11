@@ -72,7 +72,7 @@ export function App(): JSX.Element {
 
         <div className="board-wrap">
           <GameCanvas onHudChange={handleHudChange} onOverlay={handleOverlay} engineRef={engineRef} />
-          <MobileControls onDirection={handleDirection} />
+          <MobileControls onDirection={handleDirection} active={hud.mode === "playing"} />
           <Overlay
             visible={overlay.visible}
             title={overlay.title}

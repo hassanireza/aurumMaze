@@ -4,6 +4,7 @@ import type { DirectionName } from "../game/types";
 
 interface MobileControlsProps {
   readonly onDirection: (direction: DirectionName) => void;
+  readonly active: boolean;
 }
 
 /**
@@ -14,8 +15,13 @@ interface MobileControlsProps {
  * the left thumb without occluding the maze. Pause/Restart deliberately live
  * outside the canvas entirely, in `MobileActionBar`, so no button ever sits
  * on top of the game screen.
+ *
+ * `active` gates the joystick off whenever the start/pause/game-over overlay
+ * is showing, so it never sits on top of and steals taps meant for the
+ * overlay's "Start run" / "Resume" button.
  */
-export function MobileControls({ onDirection }: MobileControlsProps): JSX.Element {
+export function MobileControls({ onDirection, active }: MobileControlsProps): JSX.Element | null {
+  if (!active) return null;
   return (
     <div className="mobile-controls">
       <VirtualJoystick onDirection={onDirection} />
