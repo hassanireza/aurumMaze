@@ -1,80 +1,55 @@
 # Aurum Maze
 
-Ten luminous rounds of gold line arcade chase. A strict TypeScript, OOP,
-React rebuild of the original vanilla JS prototype.
+Fifty luminous rounds of gold-line arcade chase. Strict TypeScript, OOP game
+engine, React UI, Canvas 2D rendering. Mobile first.
 
-## Stack
-
-- React 18 + TypeScript (strict mode, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`)
-- Vite build tooling
-- Plain Canvas 2D rendering driven by an object-oriented game engine
-- No external game framework, no game state in React beyond the HUD snapshot
-
-## Architecture
-
-All gameplay logic lives in `src/game/` as plain TypeScript classes, kept
-completely separate from React:
-
-- `Vector2` - small 2D vector helper
-- `Maze` - grid, wall checks, pellet tracking for a single level
-- `Entity` - abstract base for anything that walks the grid
-- `PacMan` - player entity, input queue, movement, pellet consumption
-- `Ghost` - abstract ghost with shared scatter/chase/frightened/eaten state machine
-- `ghosts/BlinkyGhost.ts` - The Chaser, hunts Pac-Man's exact tile
-- `ghosts/PinkyGhost.ts` - The Ambusher, targets four tiles ahead of Pac-Man
-- `ghosts/InkyGhost.ts` - The Flanker, reflects Blinky's position through a point ahead of Pac-Man
-- `ghosts/ClydeGhost.ts` - The Shy One, chases from afar but retreats up close
-- `GameEngine` - owns all entities, drives the fixed-step simulation, scoring, lives and level flow
-- `Renderer` - pure canvas drawing, takes engine state and paints it
-- `InputManager` - keyboard and swipe/tap input, decoupled from React events
-
-React (`src/components/`) only renders the HUD, overlay, level list and
-touch controls, and hosts the `<canvas>` element that the engine draws into.
-
-## Ghost personalities
-
-Each ghost keeps the classic scatter and chase cycle, plus a shared
-frightened/eaten state after a power pellet, but picks its chase target
-differently:
-
-| Ghost | Personality | Targeting |
-| --- | --- | --- |
-| Blinky | The Chaser | Pac-Man's current tile, directly |
-| Pinky | The Ambusher | Four tiles ahead of Pac-Man's facing direction |
-| Inky | The Flanker | Mirrors Blinky's position through a point two tiles ahead of Pac-Man |
-| Clyde | The Shy One | Chases directly from afar, retreats to his corner within 8 tiles |
-
-## Local development
+## Run
 
 ```bash
 npm install
-npm run dev
+npm run dev        # develop
+npm run build      # type-check + production build
+npm run verify     # headless checks: 50 mazes connected, ghost AI never freezes
+npm run levels     # regenerate src/game/levelData.ts (deterministic)
 ```
-
-## Production build
-
-```bash
-npm run build
-npm run preview
-```
-
-## Deploying to GitHub Pages
-
-This repository ships with `.github/workflows/deploy.yml`, which builds the
-app with Vite and publishes `dist/` to GitHub Pages using the official
-Pages actions.
-
-1. Push this project to a repository named `AurumMaze`.
-2. In the repository settings, go to **Settings -> Pages** and set
-   **Source** to **GitHub Actions**.
-3. Push to `main` (or run the workflow manually from the Actions tab).
-4. The site will be published at `https://<your-username>.github.io/AurumMaze/`.
-
-`vite.config.ts` sets `base: "/AurumMaze/"` to match this repository name.
-If you rename the repository, update that value to match.
 
 ## Controls
 
-- Arrow keys or WASD to move, Space to pause
-- Swipe or tap the on-screen pad on touch devices
-- Tap the board to start or resume
+- **Touch:** swipe anywhere on the screen (chain swipes without lifting). Optional D-pad in the pause menu.
+- **Keyboard:** arrows or WASD; Space / Esc / P pauses.
+- Pac-Man **keeps gliding** in his last direction until a wall stops him (arcade behaviour). A turn pressed slightly before a junction is buffered for 0.55 s, then forgotten.
+
+## Ghost AI (arcade rules)
+
+- Decisions happen only at tile centres; a ghost never reverses by choice.
+- At each junction it picks the exit whose next tile is nearest its target (ties: up, left, down, right).
+- Every scatter/chase flip and every power pellet forces one U-turn.
+- Scatter 7/20/7/20/5/20/5/chase (shorter on later levels). The clock pauses while ghosts are frightened.
+- Ghost house with a door: Blinky starts outside, Pinky leaves at once, Inky and Clyde after pellet counts (or an idle timer). Eaten ghosts return as eyes and re-exit.
+- Tunnel row: wrap-around, ghosts slow down inside it.
+- Speeds are ratios of Pac-Man's: ghosts 72% -> 97% across 50 levels, frightened 50%, tunnel 45%.
+
+| Ghost | Chase target | Extra behaviour |
+| --- | --- | --- |
+| Blinky | Pac-Man's tile | "Rage": speeds up and ignores scatter when few pellets remain; random when frightened |
+| Pinky | 4 tiles ahead of Pac-Man (facing up: 4 up + 4 left, as in 1980) | Flees to the farthest corner when frightened |
+| Inky | Blinky -> (2 tiles ahead) vector, doubled | Random when frightened |
+| Clyde | Pac-Man, but retreats to his corner within 5 tiles | Hides in his corner when frightened |
+
+## Structure
+
+```
+scripts/generateLevels.mjs   deterministic maze generator -> src/game/levelData.ts
+scripts/verify.ts            headless regression checks
+src/game/                    engine (no React): Maze, Entity, PacMan, Ghost(+4 personalities),
+                             GameEngine (fixed 120 Hz step), Renderer, InputManager, Progress,
+                             difficulty.ts, worlds.ts, ghostArt.ts (shared by canvas + guide)
+src/components/              Navbar, TabBar, Hud, GhostTray, GhostGuide, PauseSheet, ...
+src/views/                   HomeView (hero, how-to-play, ghost guide), LevelsView, PlayView
+src/router.ts                hash routing (#/, #/ghosts, #/levels, #/play/N)
+```
+
+## Deploying
+
+`.github/workflows/deploy.yml` builds with Vite and publishes `dist/` to GitHub Pages.
+`vite.config.ts` sets `base: "/aurumMaze/"`; it must match the repository name.

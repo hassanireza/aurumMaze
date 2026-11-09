@@ -1,92 +1,52 @@
-import { useCallback, useRef, useState, type JSX } from "react";
+import { useEffect, useSyncExternalStore, type JSX } from "react";
+import { Backdrop } from "./components/Backdrop";
 import { Navbar } from "./components/Navbar";
-import { Hud } from "./components/Hud";
-import { Overlay } from "./components/Overlay";
-import { TouchControls } from "./components/TouchControls";
-import { MobileControls } from "./components/MobileControls";
-import { MobileActionBar } from "./components/MobileActionBar";
-import { LevelPanel } from "./components/LevelPanel";
-import { GameCanvas } from "./components/GameCanvas";
-import type { GameEngine } from "./game/GameEngine";
-import type { DirectionName, HudSnapshot } from "./game/types";
+import { TabBar } from "./components/TabBar";
+import { progressStore } from "./game/Progress";
+import { WORLDS, worldOf } from "./game/worlds";
+import { useRoute } from "./router";
+import { HomeView } from "./views/HomeView";
+import { LevelsView } from "./views/LevelsView";
+import { PlayView } from "./views/PlayView";
 
-const INITIAL_HUD: HudSnapshot = {
-  score: 0,
-  levelIndex: 0,
-  lives: 3,
-  mode: "ready",
-  statusLabel: "ready",
-  levelName: "First Signal",
-  completedLevels: []
-};
-
-interface OverlayState {
-  readonly visible: boolean;
-  readonly title: string;
-  readonly text: string;
-  readonly actionLabel: string;
+/** Tints the whole UI (backdrop, cards, tiles) with the active world's palette. */
+function applyWorld(world: number): void {
+  const w = WORLDS[world] ?? WORLDS[0]!;
+  const root = document.documentElement.style;
+  root.setProperty("--w-top", w.wallTop);
+  root.setProperty("--w-side", w.wallSide);
+  root.setProperty("--w-glow", w.glow);
+  root.setProperty("--w-sky-a", w.sky[0]);
+  root.setProperty("--w-sky-b", w.sky[1]);
 }
 
 export function App(): JSX.Element {
-  const engineRef = useRef<GameEngine | null>(null);
-  const [hud, setHud] = useState<HudSnapshot>(INITIAL_HUD);
-  const [overlay, setOverlay] = useState<OverlayState>({
-    visible: true,
-    title: "Enter the gold line",
-    text: "A stripped back arcade chase in ten precise acts. Clear every spark, master every turn, and make the maze sing.",
-    actionLabel: "Start run"
-  });
+  const route = useRoute();
+  const progress = useSyncExternalStore(progressStore.subscribe, progressStore.getSnapshot);
 
-  const handleHudChange = useCallback((snapshot: HudSnapshot) => {
-    setHud(snapshot);
-    setOverlay(prev => ({ ...prev, visible: snapshot.mode !== "playing" }));
-  }, []);
+  const playLevel = route.name === "play" ? Math.min(route.level, progress.unlocked) : 0;
+  const world = route.name === "play" ? worldOf(playLevel) : worldOf(progress.unlocked);
 
-  const handleOverlay = useCallback((title: string, text: string, actionLabel: string) => {
-    setOverlay({ visible: true, title, text, actionLabel });
-  }, []);
+  useEffect(() => {
+    applyWorld(world);
+  }, [world]);
 
-  const handlePrimaryAction = useCallback(() => {
-    engineRef.current?.start();
-  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.view = route.name;
+  }, [route.name]);
 
-  const handlePause = useCallback(() => {
-    engineRef.current?.togglePause();
-  }, []);
-
-  const handleRestart = useCallback(() => {
-    engineRef.current?.reset();
-  }, []);
-
-  const handleDirection = useCallback((direction: DirectionName) => {
-    engineRef.current?.queueDirection(direction);
-  }, []);
+  const playing = route.name === "play";
 
   return (
-    <main className="shell">
-      <section className="stage">
-        <div className="topbar">
-          <Navbar />
-          <Hud snapshot={hud} />
-        </div>
-
-        <div className="board-wrap">
-          <GameCanvas onHudChange={handleHudChange} onOverlay={handleOverlay} engineRef={engineRef} />
-          <MobileControls onDirection={handleDirection} active={hud.mode === "playing"} />
-          <Overlay
-            visible={overlay.visible}
-            title={overlay.title}
-            text={overlay.text}
-            actionLabel={overlay.actionLabel}
-            onAction={handlePrimaryAction}
-          />
-        </div>
-
-        <MobileActionBar onPause={handlePause} onRestart={handleRestart} />
-        <TouchControls onDirection={handleDirection} onPause={handlePause} onRestart={handleRestart} />
-      </section>
-
-      <LevelPanel snapshot={hud} />
-    </main>
+    <div className="app">
+      <Backdrop />
+      {playing ? null : <Navbar route={route} continueLevel={progress.unlocked} />}
+      <main className="main">
+        {route.name === "home" ? <HomeView route={route} progress={progress} /> : null}
+        {route.name === "levels" ? <LevelsView progress={progress} /> : null}
+        {route.name === "play" ? <PlayView key={playLevel} level={playLevel} progress={progress} /> : null}
+      </main>
+      {playing ? null : <TabBar route={route} continueLevel={progress.unlocked} />}
+    </div>
   );
 }

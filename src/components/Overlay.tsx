@@ -1,23 +1,23 @@
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 
 interface OverlayProps {
-  readonly visible: boolean;
+  readonly eyebrow: string;
   readonly title: string;
-  readonly text: string;
-  readonly actionLabel: string;
-  readonly onAction: () => void;
+  readonly children?: ReactNode;
+  readonly actions: ReactNode;
 }
 
-export function Overlay({ visible, title, text, actionLabel, onAction }: OverlayProps): JSX.Element | null {
-  if (!visible) return null;
+/** Centered card shown on top of the board for level-clear, game-over and victory. */
+export function Overlay({ eyebrow, title, children, actions }: OverlayProps): JSX.Element {
   return (
-    <div className="overlay">
-      <div className="monogram">AM</div>
-      <h1>{title}</h1>
-      <p>{text}</p>
-      <button type="button" onClick={onAction}>
-        {actionLabel}
-      </button>
+    <div className="overlay" role="dialog" aria-modal="false" aria-label={title}>
+      <div className="overlay-card">
+        <div className="monogram" aria-hidden="true">AM</div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h2>{title}</h2>
+        {children ? <div className="overlay-body">{children}</div> : null}
+        <div className="overlay-actions">{actions}</div>
+      </div>
     </div>
   );
 }

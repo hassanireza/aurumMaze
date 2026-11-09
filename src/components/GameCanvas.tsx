@@ -1,77 +1,81 @@
 import { useEffect, useRef, type JSX, type MutableRefObject } from "react";
-import { GameEngine } from "../game/GameEngine";
+import { GameEngine, type GameEngineEvents, type GameEngineOptions } from "../game/GameEngine";
 import { Renderer } from "../game/Renderer";
-import { InputManager } from "../game/InputManager";
-import { CANVAS_SIZE } from "../game/constants";
-import type { DirectionName, HudSnapshot } from "../game/types";
 
 interface GameCanvasProps {
-  readonly onHudChange: (snapshot: HudSnapshot) => void;
-  readonly onOverlay: (title: string, message: string, actionLabel: string) => void;
+  readonly events: GameEngineEvents;
+  readonly options: GameEngineOptions;
   readonly engineRef: MutableRefObject<GameEngine | null>;
 }
 
-export function GameCanvas({ onHudChange, onOverlay, engineRef }: GameCanvasProps): JSX.Element {
+/**
+ * Owns the engine, the renderer and the animation loop. The canvas is sized to
+ * its container and scaled by devicePixelRatio, so it stays sharp on phones.
+ * The run auto-pauses whenever the page is hidden.
+ */
+export function GameCanvas({ events, options, engineRef }: GameCanvasProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const inputRef = useRef<InputManager | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const wrap = wrapRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !wrap || !ctx) return;
 
-    const engine = new GameEngine({ onHudChange, onOverlay });
-    engineRef.current = engine;
-    const renderer = new Renderer(ctx);
-
-    const input = new InputManager(
-      (direction: DirectionName) => engine.queueDirection(direction),
-      () => engine.togglePause()
+    const engine = new GameEngine(
+      {
+        onHudChange: snapshot => eventsRef.current.onHudChange(snapshot),
+        onLevelCleared: (level, score) => eventsRef.current.onLevelCleared(level, score),
+        onGameEnd: (score, won) => eventsRef.current.onGameEnd(score, won),
+        onHaptic: kind => eventsRef.current.onHaptic(kind)
+      },
+      options
     );
-    inputRef.current = input;
+    engineRef.current = engine;
+    const renderer = new Renderer(ctx, canvas);
 
-    const detachKeyboard = input.attachKeyboard();
-
-    const handlePointerDown = (event: PointerEvent): void => {
-      input.handlePointerDown(event.clientX, event.clientY);
+    const fit = (): void => {
+      const size = wrap.clientWidth;
+      if (size > 0) renderer.resize(size, Math.min(window.devicePixelRatio || 1, 3));
     };
-    const handlePointerUp = (event: PointerEvent): void => {
-      input.handlePointerUp(event.clientX, event.clientY, () => engine.start());
-    };
-    canvas.addEventListener("pointerdown", handlePointerDown);
-    canvas.addEventListener("pointerup", handlePointerUp);
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(wrap);
 
-    let lastTime = 0;
-    let frameId = 0;
-    const loop = (time: number): void => {
-      const dt = Math.min(0.04, (time - lastTime) / 1000 || 0);
-      lastTime = time;
+    const onVisibility = (): void => {
+      if (document.hidden) engine.pause();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", onVisibility);
+
+    let last = performance.now();
+    let frame = 0;
+    const loop = (now: number): void => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
       engine.update(dt);
       renderer.draw(engine);
-      frameId = requestAnimationFrame(loop);
+      frame = requestAnimationFrame(loop);
     };
-    frameId = requestAnimationFrame(loop);
+    frame = requestAnimationFrame(loop);
 
     return () => {
-      cancelAnimationFrame(frameId);
-      detachKeyboard();
-      canvas.removeEventListener("pointerdown", handlePointerDown);
-      canvas.removeEventListener("pointerup", handlePointerUp);
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", onVisibility);
       engineRef.current = null;
     };
+    // The engine is created once per mount; the parent remounts this component per run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div className="canvas-wrap">
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        aria-label="Aurum Maze game board"
-      />
-      <div className="scanline" />
+    <div className="canvas-wrap" ref={wrapRef}>
+      <canvas ref={canvasRef} role="img" aria-label="Aurum Maze game board" />
     </div>
   );
 }
