@@ -83,7 +83,7 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
           </div>
         ) : null}
 
-        {mode === "levelclear" && hud ? (
+        {mode === "levelclear" && hud && hud.levelIndex < 255 ? (
           <Overlay
             eyebrow={`Level ${hud.levelIndex + 1} cleared`}
             title={hud.levelName}
@@ -131,6 +131,14 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
             }
           >
             <p>Final score <strong>{fmt(hud.score)}</strong></p>
+          </Overlay>
+        ) : null}
+
+        {mode === "levelclear" && hud?.levelIndex === 255 ? (
+          <Overlay eyebrow="Round 256 · kill screen" title="The maze breaks" actions={
+            <a className="btn btn-primary btn-block" href="#/">Return home</a>
+          }>
+            <p>The original arcade game has no normal ending here. The board has overflowed into its corrupted final screen.</p>
           </Overlay>
         ) : null}
       </div>

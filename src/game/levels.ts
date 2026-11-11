@@ -1,13 +1,11 @@
 import type { LevelDefinition } from "./types";
-import { LEVEL_NAMES } from "./constants";
-import { LEVEL_ROWS } from "./levelData";
-import { worldOf } from "./worlds";
+import { ARCADE_MAZE_ROWS } from "./arcadeMaze";
 
-/** 50 hand-validated, procedurally generated mazes (see scripts/generateLevels.mjs). */
-export const LEVELS: readonly LevelDefinition[] = LEVEL_ROWS.map((rows, index) => ({
-  name: LEVEL_NAMES[index] ?? `Act ${index + 1}`,
-  world: worldOf(index),
-  rows
+/** One authentic board is replayed for every round in the original arcade game. */
+export const LEVELS: readonly LevelDefinition[] = Array.from({ length: 256 }, (_, index) => ({
+  name: index === 255 ? "Split Screen" : "Arcade Maze",
+  world: 0,
+  rows: ARCADE_MAZE_ROWS
 }));
 
 export const TOTAL_LEVELS = LEVELS.length;

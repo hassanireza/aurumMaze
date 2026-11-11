@@ -307,7 +307,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 a.lv:active { transform: scale(0.98); }
 a.lv:hover { border-color: var(--wt); }
-.lv .maze-preview { grid-area: mz; width: 56px; height: 56px; border-radius: 10px; background: #0a0a09; padding: 3px; }
+.lv .maze-preview { grid-area: mz; width: 56px; height: 56px; border-radius: 10px; background: #0a0a09; padding: 3px; display: grid; place-items: center; }
+.maze-preview svg { display: block; width: 100%; height: 100%; }
 .maze-preview path { fill: var(--wt); }
 .lv-num { grid-area: num; font-family: var(--font-display); font-size: 20px; line-height: 1; align-self: end; }
 .lv-name { grid-area: name; font-size: 12px; color: var(--muted); line-height: 1.25; align-self: start; padding-top: 3px; }
@@ -352,8 +353,8 @@ html[data-view="play"], html[data-view="play"] body { overflow: hidden; height: 
 
 .play-board {
   position: relative; justify-self: center; align-self: start;
-  width: min(100vw - 12px, calc(100dvh - 70px - 150px - var(--safe-t) - var(--safe-b)));
-  aspect-ratio: 1;
+  width: min(calc(100vw - 12px), calc((100dvh - 70px - 150px - var(--safe-t) - var(--safe-b)) * 0.7778));
+  aspect-ratio: 28 / 36;
 }
 .canvas-wrap { position: absolute; inset: 0; }
 .canvas-wrap canvas { width: 100%; height: 100%; display: block; touch-action: none; }
@@ -459,7 +460,7 @@ html[data-view="play"], html[data-view="play"] body { overflow: hidden; height: 
   .cycle-steps { grid-template-columns: repeat(4, 1fr); }
   .level-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .lv { grid-template-columns: 1fr; grid-template-areas: "mz" "num" "name"; justify-items: start; row-gap: 6px; padding: 14px; }
-  .lv .maze-preview { width: 100%; height: auto; aspect-ratio: 1; }
+  .lv .maze-preview { width: 100%; height: auto; aspect-ratio: 28 / 36; }
   .lv-state { position: absolute; top: 14px; right: 14px; }
   .world-grid { grid-template-columns: repeat(3, 1fr); }
   .hud { padding-inline: 28px; }

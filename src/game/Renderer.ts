@@ -1,7 +1,7 @@
 import type { GameEngine } from "./GameEngine";
 import type { Ghost } from "./Ghost";
 import type { Maze } from "./Maze";
-import { BOARD_MARGIN, CANVAS_SIZE, CELL_SIZE, COLORS, GRID_SIZE } from "./constants";
+import { BOARD_MARGIN, CANVAS_HEIGHT, CANVAS_WIDTH, CELL_SIZE, COLORS, GRID_HEIGHT, GRID_WIDTH } from "./constants";
 import { EYE_INK, EYE_WHITE, FRIGHT_MOUTH, GHOST_ART, type EyeSpec, type GhostArt } from "./ghostArt";
 import { CLYDE_SHYNESS_RADIUS } from "./ghosts/ClydeGhost";
 import { WORLDS } from "./worlds";
@@ -9,7 +9,7 @@ import type { GhostId, WorldTheme } from "./types";
 
 const CELL = CELL_SIZE;
 const ORIGIN = BOARD_MARGIN;
-const BOARD = CELL * GRID_SIZE;
+const BOARD = CELL * GRID_HEIGHT;
 const WALL_DEPTH = CELL * 0.3;
 const SLAB_DEPTH = 18;
 const RADIUS = CELL * 0.3;
@@ -52,7 +52,7 @@ function mix(a: string, b: string, t: number): string {
  * The static scenery is cached on an offscreen canvas per level/flash state.
  */
 export class Renderer {
-  private pixel = CANVAS_SIZE;
+  private pixel = CANVAS_WIDTH;
   private cache: { key: string; canvas: HTMLCanvasElement } | null = null;
   private readonly paths: Readonly<Record<GhostId, Path2D>>;
   private readonly details: Readonly<Record<GhostId, Path2D>>;
@@ -75,17 +75,18 @@ export class Renderer {
 
   /** Sizes the backing store for crisp output on high-DPI screens. */
   public resize(cssSize: number, dpr: number): void {
-    const px = Math.max(240, Math.min(1600, Math.round(cssSize * dpr)));
-    if (px === this.pixel && this.canvas.width === px) return;
+    const px = Math.max(240, Math.min(1200, Math.round(cssSize * dpr)));
+    const py = Math.round(px * CANVAS_HEIGHT / CANVAS_WIDTH);
+    if (px === this.canvas.width && py === this.canvas.height) return;
     this.pixel = px;
     this.canvas.width = px;
-    this.canvas.height = px;
+    this.canvas.height = py;
     this.cache = null;
   }
 
   public draw(engine: GameEngine): void {
     const ctx = this.ctx;
-    const k = this.pixel / CANVAS_SIZE;
+    const k = this.pixel / CANVAS_WIDTH;
     const theme = WORLDS[engine.getWorld()] ?? WORLDS[0]!;
     const maze = engine.getMaze();
     const clock = engine.getClock();
@@ -99,6 +100,8 @@ export class Renderer {
     ctx.setTransform(k, 0, 0, k, 0, 0);
 
     this.drawPellets(maze, theme, clock);
+    if (engine.getLevelIndex() === 255) this.drawKillScreen(clock);
+    else if (engine.getFruitTime() > 0) this.drawFruit(engine.getFruit(), clock);
     if (mode !== "clearing") {
       this.drawPacman(engine);
       const ghostHidden = mode === "dying" && engine.getDeathProgress() > 0.25;
@@ -119,12 +122,12 @@ export class Renderer {
     if (this.cache?.key === key) return this.cache.canvas;
     const canvas = this.cache?.canvas ?? document.createElement("canvas");
     canvas.width = this.pixel;
-    canvas.height = this.pixel;
+    canvas.height = Math.round(this.pixel * CANVAS_HEIGHT / CANVAS_WIDTH);
     const g = canvas.getContext("2d");
     if (!g) return canvas;
-    const k = this.pixel / CANVAS_SIZE;
+    const k = this.pixel / CANVAS_WIDTH;
     g.setTransform(k, 0, 0, k, 0, 0);
-    g.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    g.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     this.paintSlab(g, theme);
     this.paintFloor(g, maze, theme);
     this.paintWalls(g, maze, theme, flash);
@@ -136,7 +139,8 @@ export class Renderer {
     const pad = 10;
     const x = ORIGIN - pad;
     const y = ORIGIN - pad;
-    const size = BOARD + pad * 2;
+    const width = CELL * GRID_WIDTH + pad * 2;
+    const height = BOARD + pad * 2;
 
     g.save();
     g.shadowColor = "rgba(0,0,0,.65)";
@@ -144,21 +148,21 @@ export class Renderer {
     g.shadowOffsetY = 20;
     g.fillStyle = theme.wallSide;
     g.beginPath();
-    roundedRect(g, x, y + SLAB_DEPTH, size, size, [18, 18, 18, 18]);
+    roundedRect(g, x, y + SLAB_DEPTH, width, height, [18, 18, 18, 18]);
     g.fill();
     g.restore();
 
-    const edge = g.createLinearGradient(0, y + size, 0, y + size + SLAB_DEPTH);
+    const edge = g.createLinearGradient(0, y + height, 0, y + height + SLAB_DEPTH);
     edge.addColorStop(0, mix(theme.wallSide, "#000000", 0.25));
     edge.addColorStop(1, mix(theme.wallSide, "#000000", 0.7));
     g.fillStyle = edge;
     g.beginPath();
-    roundedRect(g, x, y + SLAB_DEPTH, size, size, [18, 18, 18, 18]);
+    roundedRect(g, x, y + SLAB_DEPTH, width, height, [18, 18, 18, 18]);
     g.fill();
 
     g.fillStyle = theme.floor;
     g.beginPath();
-    roundedRect(g, x, y, size, size, [18, 18, 18, 18]);
+    roundedRect(g, x, y, width, height, [18, 18, 18, 18]);
     g.fill();
     g.strokeStyle = "rgba(212,175,55,.5)";
     g.lineWidth = 1.5;
@@ -181,11 +185,11 @@ export class Renderer {
       }
     }
     // soft moon-glow in the centre of the board
-    const glow = g.createRadialGradient(cx(7), cy(7), 0, cx(7), cy(7), BOARD * 0.55);
+    const glow = g.createRadialGradient(cx(13), cy(17), 0, cx(13), cy(17), BOARD * 0.55);
     glow.addColorStop(0, mix(theme.glow, "#000000", 0.82).replace("rgb", "rgba").replace(")", ",.35)"));
     glow.addColorStop(1, "rgba(0,0,0,0)");
     g.fillStyle = glow;
-    g.fillRect(ORIGIN, ORIGIN, BOARD, BOARD);
+    g.fillRect(ORIGIN, ORIGIN, CELL * GRID_WIDTH, BOARD);
   }
 
   private paintWalls(g: CanvasRenderingContext2D, maze: Maze, theme: WorldTheme, flash: boolean): void {
@@ -280,6 +284,52 @@ export class Renderer {
     }
   }
 
+  private drawKillScreen(clock: number): void {
+    const ctx = this.ctx;
+    const glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+?";
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx(14), cy(2), CELL * 14, CELL * 31);
+    ctx.clip();
+    ctx.globalAlpha = 0.94;
+    ctx.font = `700 ${CELL * 0.56}px monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let y = 2; y < 33; y += 1) {
+      for (let x = 14; x < 28; x += 1) {
+        const code = (x * 17 + y * 31 + Math.floor(clock * 2)) % glyphs.length;
+        const hue = (x * 41 + y * 29) % 360;
+        ctx.fillStyle = `hsl(${hue} 85% 65%)`;
+        ctx.fillText(glyphs[code]!, cx(x), cy(y));
+      }
+    }
+    ctx.restore();
+  }
+
+  private drawFruit(fruit: { readonly name: string; readonly points: number }, clock: number): void {
+    const ctx = this.ctx;
+    const x = cx(13.5);
+    const y = cy(23);
+    const pulse = 1 + Math.sin(clock * 8) * 0.08;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(pulse, pulse);
+    ctx.shadowColor = COLORS.gold;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = fruit.name === "Key" ? COLORS.goldSoft : "#e85d54";
+    ctx.beginPath();
+    ctx.arc(-CELL * 0.11, 0, CELL * 0.13, 0, Math.PI * 2);
+    ctx.arc(CELL * 0.1, 0, CELL * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#9dc18a";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -CELL * 0.05);
+    ctx.quadraticCurveTo(0, -CELL * 0.23, CELL * 0.13, -CELL * 0.2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /* ------------------------------------------------------------------ */
   /* Dynamic layer                                                       */
   /* ------------------------------------------------------------------ */
@@ -322,8 +372,8 @@ export class Renderer {
 
   private wrap(x: number, draw: (px: number) => void): void {
     draw(x);
-    if (x < 0.6) draw(x + GRID_SIZE);
-    if (x > GRID_SIZE - 1.6) draw(x - GRID_SIZE);
+    if (x < 0.6) draw(x + GRID_WIDTH);
+    if (x > GRID_WIDTH - 1.6) draw(x - GRID_WIDTH);
   }
 
   private shadow(x: number, y: number, scale = 1): void {

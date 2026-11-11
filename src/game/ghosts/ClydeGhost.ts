@@ -2,8 +2,8 @@ import { Ghost, type GhostContext } from "../Ghost";
 import { DIRECTIONS, GHOST_STARTS, HOME_CORNERS } from "../constants";
 import type { GhostId, GridPoint } from "../types";
 
-/** Arcade uses 8 tiles on a 28-wide board; scaled to this 15-wide board. */
-export const CLYDE_SHYNESS_RADIUS = 5;
+/** Arcade Clyde targets Pac-Man at 8 tiles or farther, otherwise his corner. */
+export const CLYDE_SHYNESS_RADIUS = 8;
 
 /**
  * Clyde - The Shy One. Chases like Blinky from afar, but loses his nerve
