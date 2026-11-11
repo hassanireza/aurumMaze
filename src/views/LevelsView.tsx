@@ -16,8 +16,7 @@ export function LevelsView({ progress }: { readonly progress: ProgressData }): J
       </header>
       <section className="world" aria-label="Pac-Man arcade rounds">
           <ul className="level-grid">
-            {LEVELS.filter((_, index) => index === 0 || index === 255 || index % 5 === 0).map(level => {
-              const index = LEVELS.indexOf(level);
+          {LEVELS.map((level, index) => {
               const locked = index > progress.unlocked;
               const done = completed.has(index);
               const current = index === progress.unlocked && !done;
