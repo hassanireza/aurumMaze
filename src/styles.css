@@ -353,7 +353,7 @@ html[data-view="play"], html[data-view="play"] body { overflow: hidden; height: 
 
 .play-board {
   position: relative; justify-self: center; align-self: start;
-  width: min(calc(100vw - 12px), calc((100dvh - 70px - 150px - var(--safe-t) - var(--safe-b)) * 0.7778));
+  width: min(calc(100vw - 36px), calc((100dvh - 185px - var(--safe-t) - var(--safe-b)) * 0.72), 560px);
   aspect-ratio: 28 / 36;
 }
 .canvas-wrap { position: absolute; inset: 0; }
@@ -476,7 +476,7 @@ html[data-view="play"], html[data-view="play"] body { overflow: hidden; height: 
   .hud-level { grid-column: 1 / -1; }
   .hud-score { grid-column: 1 / -1; text-align: left; }
   .hud-rail { display: none; }
-  .play-board { width: calc(100dvh - 16px - var(--safe-t) - var(--safe-b)); align-self: center; }
+  .play-board { width: min(calc(100dvh - 32px - var(--safe-t) - var(--safe-b)), 560px); align-self: center; }
   .play-lower { align-self: center; padding: 8px 12px; }
   .tray-list { grid-template-columns: repeat(2, 1fr); }
   .swipe-hint { display: none; }
