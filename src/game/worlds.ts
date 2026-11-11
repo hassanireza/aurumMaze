@@ -1,9 +1,9 @@
 import type { WorldTheme } from "./types";
 
 /**
- * Five worlds of ten levels. World I is the original Aurum identity (ivory on
- * ink, gold accents); the rest introduce muted Monument-Valley pastels while
- * keeping the black ground and the gold line.
+ * Palette catalog for the art direction. The authentic arcade run uses the
+ * first palette for all 256 rounds; the additional entries remain available
+ * for future non-arcade themes without changing the original progression.
  */
 export const WORLDS: readonly WorldTheme[] = [
   {

@@ -74,7 +74,7 @@ export function HomeView({ route, progress }: HomeViewProps): JSX.Element {
           </div>
           <dl className="hero-stats">
             <div><dt>Best</dt><dd>{progress.best.toLocaleString("en-US")}</dd></div>
-            <div><dt>Cleared</dt><dd>{progress.completed.length} / {TOTAL_LEVELS}</dd></div>
+            <div><dt>Cleared</dt><dd>{progress.completed.length} / {TOTAL_LEVELS - 1}</dd></div>
           </dl>
         </div>
         <div className="hero-stage">
@@ -108,8 +108,8 @@ export function HomeView({ route, progress }: HomeViewProps): JSX.Element {
           </article>
           <article className="how-card">
             <span className="how-icon"><Icon name="levels" size={26} /></span>
-            <h3>Fifty levels, five worlds</h3>
-            <p>Ghosts speed up, scatter phases shorten and orbs fade faster as you climb. Each world has its own palette and the maze changes every level.</p>
+            <h3>256 rounds, one maze</h3>
+            <p>Ghosts speed up, scatter phases shorten and orbs fade faster as you climb. The original maze repeats through round 255 before the corrupted kill screen.</p>
           </article>
         </div>
       </section>
