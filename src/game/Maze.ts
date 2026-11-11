@@ -131,7 +131,6 @@ export class Maze {
   public consumePellet(x: number, y: number): boolean {
     const key = Maze.key(x, y);
     const consumed = this.pelletSet.delete(key);
-    if (consumed) this.powerSet.delete(key);
     return consumed;
   }
 }
