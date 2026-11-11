@@ -214,6 +214,10 @@ export abstract class Ghost extends Entity {
     if (this.phase === "roam") this.pendingReverse = true;
   }
 
+  public requestReverse(): void {
+    if (this.phase === "roam") this.pendingReverse = true;
+  }
+
   public endFrightened(): void {
     this.frightened = false;
   }

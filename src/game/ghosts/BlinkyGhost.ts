@@ -14,7 +14,7 @@ export class BlinkyGhost extends Ghost {
   protected readonly scatterCorner: GridPoint = HOME_CORNERS.blinky;
 
   public constructor() {
-    super(GHOST_STARTS.blinky, DIRECTIONS.left, "roam");
+    super(GHOST_STARTS.blinky, DIRECTIONS.left, "leaving");
   }
 
   protected getChaseTarget(context: GhostContext): GridPoint {

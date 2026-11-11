@@ -1,0 +1,13 @@
+Aurum Maze · Pac-Man 256-round replacement
+
+Copy the contents of this folder over the repository root, allowing replacement of same-named files.
+
+Removed obsolete files from the new project:
+- scripts/generateLevels.mjs — procedural 50-maze generator; incompatible with the authentic single-board progression.
+- src/game/levelData.ts — generated 15x15 boards; replaced by src/game/arcadeMaze.ts.
+
+The old repository may still contain those two files after copying. Delete them to avoid confusion. Keep all other files unless you have your own local changes.
+
+Then run npm install, npm run build, and npm run verify.
+
+Accuracy note: this is a browser reimplementation using the authentic board and documented Midway level tables, not a frame-accurate arcade emulator. The 256th screen recreates the corrupted half visually; it is not a byte-exact ROM screen.

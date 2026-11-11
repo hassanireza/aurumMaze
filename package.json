@@ -2,14 +2,13 @@
   "name": "aurum-maze",
   "version": "1.0.0",
   "private": true,
-  "description": "Aurum Maze - fifty luminous rounds of arcade chase, built with React and strict TypeScript OOP.",
+  "description": "Aurum Maze - 256 rounds of arcade chase with original Pac-Man progression and Aurum art direction.",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "levels": "node scripts/generateLevels.mjs",
     "verify": "npx tsx scripts/verify.ts"
   },
   "dependencies": {

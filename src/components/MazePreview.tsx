@@ -5,7 +5,7 @@ interface MazePreviewProps {
   readonly level: LevelDefinition;
 }
 
-/** A level's walls as one SVG path: cheap enough to render all 50 at once. */
+/** The shared original board is previewed for each round. */
 export const MazePreview = memo(function MazePreview({ level }: MazePreviewProps): JSX.Element {
   let d = "";
   level.rows.forEach((row, y) => {
@@ -14,8 +14,8 @@ export const MazePreview = memo(function MazePreview({ level }: MazePreviewProps
     }
   });
   return (
-    <svg className="maze-preview" viewBox="0 0 15 15" aria-hidden="true" focusable="false">
-      <path d={d} />
-    </svg>
+    <span className="maze-preview" aria-hidden="true">
+      <svg viewBox="0 0 28 36" focusable="false"><path d={d} /></svg>
+    </span>
   );
 });

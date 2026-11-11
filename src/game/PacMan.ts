@@ -4,7 +4,7 @@ import type { DirectionVector, GridPoint } from "./types";
 import type { Maze } from "./Maze";
 
 /** Fraction of a cell after a junction in which a late turn still "cuts the corner". */
-const CORNER_WINDOW = 0.14;
+const CORNER_WINDOW = 0.4;
 
 /**
  * Player entity. Behaviour matches the arcade original: Pac-Man keeps gliding

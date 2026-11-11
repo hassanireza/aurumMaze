@@ -3,18 +3,24 @@ import { ALL_DIRECTIONS, DIRECTIONS, TUNNEL_ROW } from "./constants";
 
 /**
  * One maze layout. Glyphs: `#` wall, `.` pellet, `o` power pellet, ` ` empty
- * path, `h` ghost-house floor, `-` ghost-house door (ghosts only).
+ * path, `h` ghost-house floor (ghosts only), `-` house gate.
  */
 export class Maze {
-  private readonly grid: readonly string[][];
+  private readonly grid: string[][];
   private readonly pelletSet: Set<string>;
-  private readonly powerSet: ReadonlySet<string>;
+  private readonly powerSet: Set<string>;
   public readonly rowCount: number;
   public readonly columnCount: number;
   public readonly totalPellets: number;
 
   public constructor(definition: LevelDefinition) {
     this.grid = definition.rows.map(row => row.split(""));
+    // The ROM maze glyphs include decorative pen walls. Rebuild the walkable
+    // pen footprint as ghost-only tiles and its one-tile exit gate.
+    for (let y = 14; y <= 20; y += 1) for (let x = 11; x <= 16; x += 1) {
+      this.grid[y]![x] = "h";
+    }
+    this.grid[13]![13] = "-";
     this.rowCount = this.grid.length;
     this.columnCount = this.grid[0]?.length ?? 0;
 
@@ -44,6 +50,17 @@ export class Maze {
     return { x: (point.x + this.columnCount) % this.columnCount, y: point.y };
   }
 
+  /** Visual corruption used by the level-256 hardware overflow; paths stay open there. */
+  public corruptRightHalf(): void {
+    for (let y = 2; y < this.rowCount - 2; y += 1) {
+      for (let x = 14; x < this.columnCount; x += 1) {
+        this.grid[y]![x] = " ";
+      }
+    }
+    // Keep original dot logic/count even though the right half is visually corrupt.
+    // Hidden pellets remain collectible as in the arcade memory-overflow state.
+  }
+
   public glyph(x: number, y: number): string {
     return this.grid[y]?.[x] ?? "#";
   }
@@ -71,7 +88,8 @@ export class Maze {
     if (!cell) return false;
     const g = this.glyph(cell.x, cell.y);
     if (g === "#") return false;
-    if (g === "h" || g === "-") return allowHouse;
+    if (g === "h") return allowHouse;
+    if (g === "-") return true;
     return true;
   }
 
@@ -111,6 +129,9 @@ export class Maze {
   }
 
   public consumePellet(x: number, y: number): boolean {
-    return this.pelletSet.delete(Maze.key(x, y));
+    const key = Maze.key(x, y);
+    const consumed = this.pelletSet.delete(key);
+    if (consumed) this.powerSet.delete(key);
+    return consumed;
   }
 }

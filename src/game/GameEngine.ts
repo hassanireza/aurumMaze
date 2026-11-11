@@ -6,7 +6,7 @@ import { PinkyGhost } from "./ghosts/PinkyGhost";
 import { InkyGhost } from "./ghosts/InkyGhost";
 import { ClydeGhost } from "./ghosts/ClydeGhost";
 import { LEVELS, TOTAL_LEVELS } from "./levels";
-import { levelConfig, type LevelConfig } from "./difficulty";
+import { fruitForLevel, levelConfig, type LevelConfig } from "./difficulty";
 import { Rng } from "./Rng";
 import {
   DIRECTIONS,
@@ -69,6 +69,9 @@ export class GameEngine {
   private levelStartScore = 0;
   private levelStartLives = STARTING_LIVES;
   private extraLifeGiven = false;
+  private dotsEaten = 0;
+  private fruitVisible = 0;
+  private fruitAvailable: Set<number> = new Set();
 
   private frightLeft = 0;
   private chain = 0;
@@ -97,6 +100,7 @@ export class GameEngine {
     this.completed = new Set(options.completed);
     this.config = levelConfig(this.levelIndex);
     this.maze = new Maze(LEVELS[this.levelIndex]!);
+    if (this.levelIndex === 255) this.maze.corruptRightHalf();
     this.pacman = new PacMan(PACMAN_START);
     this.ghosts = this.spawnGhosts();
     this.beginRound();
@@ -134,6 +138,8 @@ export class GameEngine {
     this.huntPhase = this.config.schedule[0]!.phase;
     this.huntTimer = this.config.schedule[0]!.seconds;
     for (const ghost of this.ghosts) ghost.huntPhase = this.huntPhase;
+    this.fruitVisible = 0;
+    this.fruitAvailable.clear();
     this.eatenThisLife = 0;
     this.idleTimer = 0;
     this.sinceRelease = RELEASE_GAP_SECONDS;
@@ -148,6 +154,10 @@ export class GameEngine {
     this.levelIndex = index;
     this.config = levelConfig(index);
     this.maze = new Maze(LEVELS[index]!);
+    if (index === 255) this.maze.corruptRightHalf();
+    this.dotsEaten = 0;
+    this.fruitVisible = 0;
+    this.fruitAvailable = new Set();
     this.levelStartScore = this.score;
     this.levelStartLives = this.lives;
     this.beginRound();
@@ -242,6 +252,8 @@ export class GameEngine {
       return;
     }
 
+    if (this.fruitVisible > 0) this.fruitVisible = Math.max(0, this.fruitVisible - dt);
+
     if (this.frightLeft > 0) {
       this.frightLeft = Math.max(0, this.frightLeft - dt);
       if (this.frightLeft === 0) for (const ghost of this.ghosts) ghost.endFrightened();
@@ -297,15 +309,33 @@ export class GameEngine {
 
   private handlePellet = (isPower: boolean): void => {
     this.eatenThisLife += 1;
+    this.dotsEaten += 1;
     this.idleTimer = 0;
     this.addScore(PELLET_SCORE + this.levelIndex * PELLET_SCORE_PER_LEVEL);
+    if ((this.dotsEaten === 70 || this.dotsEaten === 170) && !this.fruitAvailable.has(this.dotsEaten)) {
+      this.fruitAvailable.add(this.dotsEaten);
+      this.fruitVisible = 9.5;
+    }
+    const fruitPos = this.pacman.renderPosition();
+    if (this.fruitVisible > 0 && Math.hypot(fruitPos.x - 13.5, fruitPos.y - 23) < 0.5) {
+      this.addScore(fruitForLevel(this.levelIndex).points);
+      this.fruitVisible = 0;
+    }
     if (!isPower) return;
     this.addScore(POWER_PELLET_SCORE);
+    if (this.config.frightSeconds <= 0) {
+      for (const ghost of this.ghosts) ghost.requestReverse();
+      this.events.onHaptic("power");
+      return;
+    }
     this.frightLeft = this.config.frightSeconds;
     this.chain = 0;
     for (const ghost of this.ghosts) ghost.startFrightened();
     this.events.onHaptic("power");
   };
+
+  public getFruitTime(): number { return this.fruitVisible; }
+  public getFruit(): { readonly name: string; readonly points: number } { return fruitForLevel(this.levelIndex); }
 
   private addScore(points: number): void {
     this.score += points;
@@ -347,6 +377,8 @@ export class GameEngine {
       this.mode = "over";
       this.events.onGameEnd(this.score, false);
     } else {
+      this.fruitVisible = 0;
+      this.fruitAvailable.clear();
       this.beginRound();
     }
     this.emitHud(true);
@@ -355,6 +387,11 @@ export class GameEngine {
   private startClearing(): void {
     this.mode = "clearing";
     this.clearTimer = 0;
+    if (this.levelIndex === 255) {
+      this.mode = "levelclear";
+      this.emitHud(true);
+      return;
+    }
     this.completed.add(this.levelIndex);
     this.addScore(LEVEL_CLEAR_BONUS);
     this.events.onLevelCleared(this.levelIndex, this.score);
@@ -363,12 +400,7 @@ export class GameEngine {
   }
 
   private afterClear(): void {
-    if (this.levelIndex >= TOTAL_LEVELS - 1) {
-      this.mode = "won";
-      this.events.onGameEnd(this.score, true);
-    } else {
-      this.mode = "levelclear";
-    }
+    this.mode = "levelclear";
     this.emitHud(true);
   }
 

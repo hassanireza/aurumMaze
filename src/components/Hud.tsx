@@ -19,7 +19,7 @@ export function Hud({ snapshot, onPause }: HudProps): JSX.Element {
       </button>
       <div className="hud-level">
         <span>Level {snapshot.levelIndex + 1}</span>
-        <strong>{snapshot.levelName}</strong>
+        <strong>{snapshot.levelIndex === 255 ? "Kill screen" : snapshot.levelName}</strong>
       </div>
       <div className="hud-score" aria-label={`Score ${snapshot.score}`}>
         <span>Score</span>

@@ -58,6 +58,10 @@ class ProgressStore {
   public getSnapshot = (): ProgressData => this.data;
 
   public markCleared(levelIndex: number, score: number): void {
+    if (levelIndex >= 255) {
+      this.recordScore(score);
+      return;
+    }
     const completed = this.data.completed.includes(levelIndex) ? this.data.completed : [...this.data.completed, levelIndex];
     this.commit({
       ...this.data,

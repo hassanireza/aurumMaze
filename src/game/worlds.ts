@@ -63,5 +63,5 @@ export const WORLDS: readonly WorldTheme[] = [
   }
 ];
 
-export const LEVELS_PER_WORLD = 10;
-export const worldOf = (levelIndex: number): number => Math.min(WORLDS.length - 1, Math.floor(levelIndex / LEVELS_PER_WORLD));
+export const LEVELS_PER_WORLD = 256;
+export const worldOf = (_levelIndex: number): number => 0;

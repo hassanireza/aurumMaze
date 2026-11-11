@@ -4,7 +4,7 @@ import { GhostGuide, ModeCycle } from "../components/GhostGuide";
 import { Icon } from "../components/Icons";
 import { PacLogo } from "../components/Navbar";
 import { TOTAL_LEVELS } from "../game/levels";
-import { WORLDS, LEVELS_PER_WORLD } from "../game/worlds";
+import { WORLDS } from "../game/worlds";
 import { GHOST_ORDER } from "../game/ghostArt";
 import type { ProgressData } from "../game/Progress";
 import { playHref, type Route } from "../router";
@@ -60,11 +60,11 @@ export function HomeView({ route, progress }: HomeViewProps): JSX.Element {
     <div className="page home">
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow"><PacLogo /> An arcade chase in fifty acts</p>
+          <p className="eyebrow"><PacLogo /> 256 rounds · one arcade maze</p>
           <h1>Aurum <em>Maze</em></h1>
           <p className="lede">
-            Glide along the gold line, eat every spark, and outwit four ghosts who each hunt in their own way.
-            Built on the rules of the 1980 original, redrawn as a quiet, impossible architecture.
+            Clear the original maze through 255 rounds, then face the famous corrupted 256th screen.
+            Original arcade progression, reimagined with Aurum’s gold-lit architecture.
           </p>
           <div className="hero-cta">
             <a className="btn btn-primary btn-large" href={playHref(next)}>
@@ -128,14 +128,14 @@ export function HomeView({ route, progress }: HomeViewProps): JSX.Element {
 
       <section className="section" aria-labelledby="worlds">
         <p className="eyebrow">Worlds</p>
-        <h2 id="worlds">Five palettes</h2>
+        <h2 id="worlds">One evolving palette</h2>
         <ul className="world-grid">
-          {WORLDS.map((world, i) => (
+          {WORLDS.slice(0, 1).map(world => (
             <li key={world.name} className="world-card" style={{ "--wt": world.wallTop, "--ws": world.wallSide } as React.CSSProperties}>
               <span className="world-swatch" aria-hidden="true"><i /><i /></span>
               <div>
                 <strong>{world.name}</strong>
-                <small>Levels {i * LEVELS_PER_WORLD + 1}–{(i + 1) * LEVELS_PER_WORLD} · {world.tagline}</small>
+                <small>Rounds 1–256 · one maze, rising arcade difficulty</small>
               </div>
             </li>
           ))}

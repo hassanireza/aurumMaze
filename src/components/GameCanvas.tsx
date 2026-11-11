@@ -38,8 +38,8 @@ export function GameCanvas({ events, options, engineRef }: GameCanvasProps): JSX
     const renderer = new Renderer(ctx, canvas);
 
     const fit = (): void => {
-      const size = wrap.clientWidth;
-      if (size > 0) renderer.resize(size, Math.min(window.devicePixelRatio || 1, 3));
+      const width = Math.min(wrap.clientWidth, wrap.clientHeight * 28 / 36);
+      if (width > 0) renderer.resize(width, Math.min(window.devicePixelRatio || 1, 3));
     };
     fit();
     const observer = new ResizeObserver(fit);
