@@ -485,7 +485,7 @@ html[data-view="play"], html[data-view="play"] body { overflow: hidden; height: 
 /* Short portrait phones (e.g. iPhone SE): keep the board as large as fits */
 @media (max-height: 700px) and (orientation: portrait) {
   .hud { min-height: 60px; padding-block: 6px 8px; }
-  .play-board { width: min(100vw - 12px, calc(100dvh - 60px - 128px - var(--safe-t) - var(--safe-b))); }
+  .play-board { width: min(calc(100vw - 36px), calc((100dvh - 185px - var(--safe-t) - var(--safe-b)) * 0.72), 560px); }
   .tray-ghost svg { width: 28px; height: 28px; }
 }
 

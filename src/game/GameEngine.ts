@@ -191,7 +191,7 @@ export class GameEngine {
 
   /** Continue from the level-clear card. */
   public nextLevel(): void {
-    if (this.mode !== "levelclear") return;
+    if (this.mode !== "levelclear" || this.levelIndex >= TOTAL_LEVELS - 1) return;
     this.loadLevel(this.levelIndex + 1);
   }
 
@@ -200,6 +200,7 @@ export class GameEngine {
     const wasOver = this.mode === "over";
     this.score = this.levelStartScore;
     this.lives = wasOver ? STARTING_LIVES : this.levelStartLives;
+    if (wasOver) this.extraLifeGiven = this.score >= EXTRA_LIFE_AT;
     this.loadLevel(this.levelIndex);
   }
 

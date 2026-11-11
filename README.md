@@ -34,7 +34,7 @@ npm run verify     # arcade board connectivity, pellet count and round-256 check
 | Blinky | Pac-Man's tile | "Rage": speeds up and ignores scatter when few pellets remain; random when frightened |
 | Pinky | 4 tiles ahead of Pac-Man (facing up: 4 up + 4 left, as in 1980) | Flees to the farthest corner when frightened |
 | Inky | Blinky -> (2 tiles ahead) vector, doubled | Random when frightened |
-| Clyde | Pac-Man, but retreats to his corner within 5 tiles | Hides in his corner when frightened |
+| Clyde | Pac-Man, but retreats to his corner within 8 tiles | Hides in his corner when frightened |
 
 ## Structure
 

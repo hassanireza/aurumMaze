@@ -7,7 +7,7 @@ export const CLYDE_SHYNESS_RADIUS = 8;
 
 /**
  * Clyde - The Shy One. Chases like Blinky from afar, but loses his nerve
- * inside five tiles and bolts for his home corner, producing a hesitant,
+ * inside eight tiles and bolts for his home corner, producing a hesitant,
  * looping patrol. When frightened he hides in that same corner.
  */
 export class ClydeGhost extends Ghost {

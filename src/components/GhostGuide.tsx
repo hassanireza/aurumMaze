@@ -39,7 +39,7 @@ const GUIDE: Readonly<Record<GhostId, GuideEntry>> = {
   inky: {
     name: "Inky",
     epithet: "The Flanker",
-    start: "Leaves after about ten sparks on level 1, sooner later on.",
+    start: "Leaves after 30 sparks on level 1, sooner later on.",
     targets: "Two tiles ahead of you becomes a pivot; a line from Blinky through it is doubled. Two ghosts, one pincer.",
     corner: "Bottom right",
     panic: "Wanders at random.",
@@ -49,8 +49,8 @@ const GUIDE: Readonly<Record<GhostId, GuideEntry>> = {
   clyde: {
     name: "Clyde",
     epithet: "The Shy One",
-    start: "Leaves last, after about twenty-two sparks on level 1.",
-    targets: "You, from afar. Inside five tiles he loses his nerve and bolts for his corner.",
+    start: "Leaves last, after 60 sparks on level 1.",
+    targets: "You, from afar. Inside eight tiles he loses his nerve and bolts for his corner.",
     corner: "Bottom left",
     panic: "Hides in his corner.",
     quirk: "His retreat makes him the easiest to slip past, and the hardest to predict.",
@@ -140,7 +140,7 @@ function Diagram({ id }: { readonly id: GhostId }): JSX.Element {
       {id === "clyde" && (
         <>
           <circle cx={mid(4)} cy={mid(4)} r={CELL * 3} fill={color} fillOpacity="0.08" stroke={color} strokeWidth="1.4" strokeDasharray="5 4" />
-          <text x={mid(4)} y={mid(4) - 36} className="gd-label" textAnchor="middle">5 tiles</text>
+          <text x={mid(4)} y={mid(4) - 36} className="gd-label" textAnchor="middle">8 tiles</text>
           <line x1={mid(8)} y1={mid(7)} x2={mid(4) + 8} y2={mid(4) + 8} {...dash} />
           <path d={`M${mid(5)} ${mid(5)} L${mid(1)} ${mid(8)}`} stroke={color} strokeWidth="1.6" fill="none" strokeLinecap="round" />
           <Target x={0} y={8} color={color} />

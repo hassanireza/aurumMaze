@@ -27,7 +27,7 @@ export function Navbar({ route, continueLevel }: NavbarProps): JSX.Element {
         <PacLogo />
         <span className="brand-text">
           <b>Aurum Maze</b>
-          <small>Fifty luminous rounds</small>
+          <small>256 arcade rounds</small>
         </span>
       </a>
       <nav className="nav-links" aria-label="Primary">
