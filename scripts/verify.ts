@@ -177,26 +177,75 @@ ok("pac-man: steering, instant reverse, tunnel wrap, corner window");
 }
 
 
+/* ---------- late / early turn windows ---------- */
+{
+  const m = new Maze(LEVELS[0]!);
+  const noop = (): void => undefined;
+  // Pac-Man heading right along row 5; column 6 has an opening downward (row 6 col 6 is a pellet path).
+  const late = new PacMan({ x: 6.6, y: 5 });
+  late.queueDirection(DIRECTIONS.right);
+  late.update(m, 1 / 120, 8, noop);
+  late.queueDirection(DIRECTIONS.down);
+  late.update(m, 1 / 120, 8, noop);
+  if (late.direction !== DIRECTIONS.down || Math.abs(late.px - 6) > 0.01) fail(`a turn pressed 0.6 tile late must still turn at the junction (dir ${late.direction.name}, x ${late.px})`);
+  const tooLate = new PacMan({ x: 7.2, y: 5 });
+  tooLate.queueDirection(DIRECTIONS.right);
+  tooLate.update(m, 1 / 120, 8, noop);
+  tooLate.queueDirection(DIRECTIONS.down);
+  tooLate.update(m, 1 / 120, 8, noop);
+  if (tooLate.direction === DIRECTIONS.down && Math.abs(tooLate.px - 6) < 0.01) fail("a turn 1.2 tiles late must not snap back that far");
+  // an early swipe is remembered, then expires by distance
+  const early = new PacMan({ x: 2, y: 5 });
+  early.queueDirection(DIRECTIONS.right);
+  early.update(m, 1 / 120, 8, noop);
+  early.queueDirection(DIRECTIONS.down);
+  for (let i = 0; i < 120 * 0.2; i += 1) early.update(m, 1 / 120, 8, noop);
+  if (early.hasQueuedTurn !== DIRECTIONS.down && early.direction !== DIRECTIONS.down) fail("early swipe should still be pending shortly after");
+  const stale = new PacMan({ x: 7, y: 5 });
+  stale.queueDirection(DIRECTIONS.right);
+  stale.update(m, 1 / 120, 8, noop);
+  stale.queueDirection(DIRECTIONS.up);
+  for (let i = 0; i < 120 * 1.2; i += 1) stale.update(m, 1 / 120, 8, noop);
+  if (stale.hasQueuedTurn !== DIRECTIONS.none) fail("a stale swipe must be forgotten");
+}
+ok("turn windows: late 0.7, early 0.45, stale swipes expire");
+
 /* ---------- swipe recognition ---------- */
 {
   const { SwipeRecognizer } = await import("../src/game/SwipeRecognizer");
-  const run = (points: readonly [number, number, number][]): string[] => {
+  type P = readonly [number, number];
+  /** Interpolates straight segments at 2 px spacing, like a 120 Hz touch screen. */
+  const trace = (pts: readonly P[]): P[] => {
+    const out: P[] = [pts[0]!];
+    for (let i = 1; i < pts.length; i += 1) {
+      const [x0, y0] = pts[i - 1]!; const [x1, y1] = pts[i]!;
+      const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 2));
+      for (let k = 1; k <= n; k += 1) out.push([x0 + ((x1 - x0) * k) / n, y0 + ((y1 - y0) * k) / n]);
+    }
+    return out;
+  };
+  const run = (pts: readonly P[]): string[] => {
+    const path = trace(pts);
     const r = new SwipeRecognizer();
     const out: string[] = [];
-    r.start(points[0]![0], points[0]![1], points[0]![2]);
-    for (const [x, y, t] of points.slice(1)) { const d = r.move(x, y, t); if (d) out.push(d); }
+    r.start(path[0]![0], path[0]![1]);
+    for (const [x, y] of path.slice(1)) { const d = r.move(x, y); if (d) out.push(d); }
     return out;
   };
   const eq = (a: string[], b: string[], name: string): void => { if (a.join() !== b.join()) fail(`swipe: ${name}: got [${a}] expected [${b}]`); };
-  eq(run([[100, 100, 0], [112, 100, 200]]), ["right"], "slow swipe right");
-  eq(run([[100, 100, 0], [107, 100, 40]]), ["right"], "quick flick");
-  eq(run([[100, 100, 0], [111, 110, 200]]), [], "diagonal is ambiguous");
-  eq(run([[100, 100, 0], [112, 100, 100], [100, 101, 300]]), ["right"], "12px wobble back must not reverse");
-  eq(run([[100, 100, 0], [112, 100, 100], [200, 100, 300], [185, 100, 400]]), ["right"], "wobble after a long stroke must not reverse");
-  eq(run([[100, 100, 0], [112, 100, 100], [200, 100, 300], [165, 100, 500]]), ["right", "left"], "deliberate reverse from furthest point");
-  eq(run([[100, 100, 0], [112, 100, 100], [114, 114, 300]]), ["right", "down"], "turn 90 degrees");
-  eq(run([[100, 100, 0], [112, 100, 100], [130, 104, 150], [150, 98, 200]]), ["right"], "steady stroke fires once");
-  eq(run([[100, 100, 0], [112, 100, 100], [114, 114, 250], [112, 132, 500], [108, 131, 520]]), ["right", "down"], "no reverse from end jitter");
+  eq(run([[100, 100], [125, 100]]), ["right"], "short swipe right");
+  eq(run([[100, 100], [100, 70]]), ["up"], "short swipe up");
+  eq(run([[100, 100], [108, 104], [100, 108]]), [], "thumb landing roll is ignored");
+  eq(run([[100, 100], [111, 111]]), [], "a 45 degree stroke is undecided, never guessed");
+  eq(run([[200, 400], [60, 425]]), ["left"], "long left swipe that drifts 10 degrees downward");
+  eq(run([[200, 400], [60, 440]]), ["left"], "thumb arc: left swipe drifting 16 degrees must stay left");
+  eq(run([[100, 100], [160, 100], [140, 100]]), ["right"], "20px wobble back must not reverse");
+  eq(run([[100, 100], [160, 100], [150, 108], [144, 102]]), ["right"], "jitter at the end of a stroke is ignored");
+  eq(run([[100, 100], [160, 100], [120, 100]]), ["right", "left"], "a deliberate 40px reverse works");
+  eq(run([[100, 100], [160, 100], [160, 130]]), ["right", "down"], "L shaped stroke turns");
+  eq(run([[100, 100], [100, 60], [100, 100]]), ["up", "down"], "up then deliberate down");
+  eq(run([[100, 100], [100, 60], [95, 62], [106, 58], [100, 59]]), ["up"], "shaking while pointing up stays up");
+  eq(run([[100, 100], [160, 100], [160, 125], [125, 125]]), ["right", "down", "left"], "zig zag without lifting");
 }
-ok("swipe recognizer: slop, flick, no jitter reversals");
+ok("swipe recognizer: tangent based, ignores landing roll, arcs and lift jitter");
 console.log("verify passed");

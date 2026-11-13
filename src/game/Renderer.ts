@@ -400,6 +400,28 @@ export class Renderer {
       ctx.closePath();
       ctx.fill();
     });
+
+    // Shows what the game understood from your swipe until it is carried out (or forgotten).
+    const queued = pac.hasQueuedTurn;
+    if (queued.x !== 0 || queued.y !== 0) {
+      const px = cx(pos.x + queued.x * 1.25);
+      const py = cy(pos.y + queued.y * 1.25);
+      const a = Math.atan2(queued.y, queued.x);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(a);
+      ctx.fillStyle = "rgba(255,226,120,.92)";
+      ctx.strokeStyle = "rgba(0,0,0,.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(CELL * 0.34, 0);
+      ctx.lineTo(-CELL * 0.2, -CELL * 0.3);
+      ctx.lineTo(-CELL * 0.2, CELL * 0.3);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   private drawEyes(eyes: readonly EyeSpec[], dx: number, dy: number): void {
