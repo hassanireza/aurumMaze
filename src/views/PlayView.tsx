@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { FruitIcon } from "../components/FruitIcon";
 import { GameCanvas } from "../components/GameCanvas";
 import { GhostTray } from "../components/GhostTray";
 import { Hud } from "../components/Hud";
 import { Icon } from "../components/Icons";
 import { Overlay } from "../components/Overlay";
 import { PauseSheet } from "../components/PauseSheet";
+import { PacLogo } from "../components/Brand";
 import { TouchControls } from "../components/TouchControls";
 import type { GameEngine, GameEngineEvents } from "../game/GameEngine";
 import { InputManager } from "../game/InputManager";
 import { haptic, progressStore, type ProgressData } from "../game/Progress";
-import { TOTAL_LEVELS } from "../game/levels";
+import { fruitForLevel } from "../game/difficulty";
+import { sfx } from "../game/Sfx";
 import type { DirectionName, HudSnapshot } from "../game/types";
-import { playHref, replaceHash } from "../router";
+import { replaceHash } from "../router";
 
 interface PlayViewProps {
   readonly level: number;
@@ -27,12 +30,15 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
   hapticsRef.current = progress.haptics;
   const [hud, setHud] = useState<HudSnapshot | null>(null);
 
+  sfx.enabled = progress.sound;
+
   const events = useMemo<GameEngineEvents>(
     () => ({
       onHudChange: setHud,
       onLevelCleared: (index, score) => progressStore.markCleared(index, score),
       onGameEnd: score => progressStore.recordScore(score),
-      onHaptic: kind => haptic(kind, hapticsRef.current)
+      onHaptic: kind => haptic(kind, hapticsRef.current),
+      onSound: name => sfx.play(name)
     }),
     []
   );
@@ -66,50 +72,29 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
 
   const mode = hud?.mode ?? "ready";
   const engine = (): GameEngine | null => engineRef.current;
+  const round = (hud?.levelIndex ?? level) + 1;
+  const fruitRounds = [round - 3, round - 2, round - 1].filter(r => r >= 0).map(r => fruitForLevel(r).name);
 
   return (
     <div className="play" ref={surfaceRef}>
-      {hud ? <Hud snapshot={hud} onPause={() => engine()?.pause()} /> : <header className="hud" />}
+      {hud ? <Hud snapshot={hud} onPause={() => engine()?.pause()} onZoom={() => progressStore.setView(progress.view === "full" ? "close" : progress.view === "close" ? "closer" : "full")} /> : <header className="hud" />}
 
+      <div className="play-main">
       <div className="play-board">
-        <GameCanvas events={events} options={options} engineRef={engineRef} />
+        <GameCanvas events={events} options={options} engineRef={engineRef} view={progress.view} />
 
-        {mode === "ready" ? (
-          <div className="ready" aria-live="polite">
-            <span className="ready-pill">
-              <Icon name="swipe" size={18} />
-              {progress.controls === "swipe" ? "Swipe anywhere to begin" : "Press a direction to begin"}
-            </span>
-          </div>
-        ) : null}
-
-        {mode === "levelclear" && hud && hud.levelIndex < 255 ? (
-          <Overlay
-            eyebrow={`Level ${hud.levelIndex + 1} cleared`}
-            title={hud.levelName}
-            actions={
-              <>
-                <button type="button" className="btn btn-primary btn-block" onClick={() => engine()?.nextLevel()} autoFocus>
-                  Next level <Icon name="arrow-right" size={18} />
-                </button>
-                <a className="btn btn-ghost btn-block" href="#/levels">Levels</a>
-              </>
-            }
-          >
-            <p>Score <strong>{fmt(hud.score)}</strong></p>
-          </Overlay>
-        ) : null}
+        {mode === "clearing" ? <div className="toast" role="status">Round {round} cleared</div> : null}
 
         {mode === "over" && hud ? (
           <Overlay
-            eyebrow="The line went dark"
-            title="Run it back"
+            eyebrow="Game over"
+            title="The line went dark"
             actions={
               <>
-                <button type="button" className="btn btn-primary btn-block" onClick={() => engine()?.restartLevel()} autoFocus>
-                  <Icon name="restart" size={18} /> Try level {hud.levelIndex + 1} again
+                <button type="button" className="btn btn-primary btn-block btn-large" onClick={() => engine()?.restartLevel()} autoFocus>
+                  <Icon name="restart" size={20} /> Try round {hud.levelIndex + 1} again
                 </button>
-                <a className="btn btn-ghost btn-block" href="#/levels">Levels</a>
+                <a className="btn btn-ghost btn-block" href="#/">Home</a>
               </>
             }
           >
@@ -117,49 +102,46 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
           </Overlay>
         ) : null}
 
-        {mode === "won" && hud ? (
-          <Overlay
-            eyebrow="Aurum Crown"
-            title={`${TOTAL_LEVELS} lines cleared`}
-            actions={
-              <>
-                <a className="btn btn-primary btn-block" href={playHref(0)}>
-                  Play again from level 1
-                </a>
-                <a className="btn btn-ghost btn-block" href="#/">Home</a>
-              </>
-            }
-          >
-            <p>Final score <strong>{fmt(hud.score)}</strong></p>
-          </Overlay>
-        ) : null}
-
         {mode === "levelclear" && hud?.levelIndex === 255 ? (
           <Overlay eyebrow="Round 256 · kill screen" title="The maze breaks" actions={
-            <a className="btn btn-primary btn-block" href="#/">Return home</a>
+            <a className="btn btn-primary btn-block btn-large" href="#/">Return home</a>
           }>
-            <p>The original arcade game has no normal ending here. The board has overflowed into its corrupted final screen.</p>
+            <p>The arcade original ends here: the board overflows into its famous corrupted screen. You reached it.</p>
           </Overlay>
         ) : null}
       </div>
 
-      <div className="play-lower">
-        {hud ? <GhostTray snapshot={hud} /> : null}
-        {progress.controls === "dpad" ? (
-          <TouchControls onDirection={(d: DirectionName) => engine()?.queueDirection(d)} />
-        ) : (
-          <p className="swipe-hint" aria-hidden="true"><Icon name="swipe" size={16} /> Swipe anywhere · arrows or WASD on keyboard</p>
-        )}
+      <div className="play-bottom">
+        <p className={mode === "ready" ? "hint" : "hint hint-off"} aria-live="polite">
+          <Icon name="swipe" size={18} />
+          {progress.controls === "swipe" ? `Round ${round} · swipe anywhere to start` : `Round ${round} · press a direction to start`}
+        </p>
+        <div className="status-row">
+          <div className="lives" role="img" aria-label={`${hud?.lives ?? 3} lives`}>
+            {Array.from({ length: Math.max(0, Math.min(hud?.lives ?? 3, 5)) }, (_, i) => <PacLogo key={i} className="life" />)}
+          </div>
+          {hud ? <GhostTray snapshot={hud} /> : <span />}
+          <div className="fruits" aria-hidden="true">
+            {fruitRounds.map((name, i) => <FruitIcon key={i} name={name} size={22} />)}
+            <FruitIcon name={fruitForLevel(round - 1).name} size={26} />
+          </div>
+        </div>
+        {progress.controls === "dpad" ? <TouchControls onDirection={(d: DirectionName) => engine()?.queueDirection(d)} /> : null}
+      </div>
       </div>
 
       {mode === "paused" ? (
         <PauseSheet
           controls={progress.controls}
           haptics={progress.haptics}
+          sound={progress.sound}
+          view={progress.view}
+          onView={v => progressStore.setView(v)}
           onResume={() => engine()?.resume()}
           onRestart={() => engine()?.restartLevel()}
           onControls={c => progressStore.setControls(c)}
           onHaptics={h => progressStore.setHaptics(h)}
+          onSound={s => progressStore.setSound(s)}
         />
       ) : null}
 
