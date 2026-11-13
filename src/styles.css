@@ -45,6 +45,8 @@ ul { list-style: none; }
 .icon-fill { fill: currentColor; }
 
 /* ---------- shell ---------- */
+/* Solid cap behind the iOS status bar (installed web app, translucent bar) so nothing shows or blurs through it. */
+.app::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: var(--safe-t); background: #050505; z-index: 60; pointer-events: none; }
 .app {
   position: relative;
   display: flex;
@@ -193,12 +195,12 @@ ul { list-style: none; }
 .play {
   position: absolute; inset: 0; z-index: 1;
   display: flex; flex-direction: column;
-  padding-top: var(--safe-t); padding-bottom: var(--safe-b);
+  padding-top: calc(var(--safe-t) + 16px); padding-bottom: var(--safe-b);
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
-.hud { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 12px 10px; min-height: 62px; }
+.hud { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 12px 10px; min-height: 66px; background: transparent; }
 .hud-stat { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; }
-.hud-stat span { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
+.hud-stat span { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .hud-stat strong { font: 500 22px var(--serif); font-variant-numeric: tabular-nums; }
 .hud-score { flex: 1; }
 .hud-score strong { color: var(--gold-2); font-size: 26px; }
@@ -282,6 +284,7 @@ ul { list-style: none; }
   .btn-cta { min-height: 64px; }
   .screen { gap: 10px; }
   .hud { min-height: 54px; }
+  .play { padding-top: calc(var(--safe-t) + 8px); }
   .tray-ghost { height: 32px; }
 }
 @media (min-width: 600px) and (min-height: 700px) {
