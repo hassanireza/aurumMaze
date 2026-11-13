@@ -1,5 +1,6 @@
 import type { DirectionName } from "./types";
 import { sfx } from "./Sfx";
+import { SLOP, SwipeRecognizer } from "./SwipeRecognizer";
 
 const KEY_MAP: Readonly<Record<string, DirectionName>> = {
   ArrowLeft: "left",
@@ -16,14 +17,10 @@ const KEY_MAP: Readonly<Record<string, DirectionName>> = {
   S: "down"
 };
 
-/** Pixels of finger travel that count as one swipe. Small = snappy. */
-const SWIPE_THRESHOLD = 12;
-
 /**
- * Keyboard and swipe-anywhere input. Gestures are *continuous*: after each
- * recognised swipe the origin re-anchors to the finger, so you can steer in a
- * zig-zag without ever lifting your thumb (the same model used by the best
- * one-thumb arcade games). Pac-Man then keeps gliding on his own.
+ * Keyboard and swipe-anywhere input. Gestures are continuous (steer in a
+ * zig-zag without lifting your thumb) and recognised by SwipeRecognizer.
+ * Pac-Man then keeps gliding on his own.
  */
 export class InputManager {
   public constructor(
@@ -56,21 +53,36 @@ export class InputManager {
 
   /** Attach swipe + tap handling to `element` (the whole play surface). */
   public attachGestures(element: HTMLElement): () => void {
+    const recognizer = new SwipeRecognizer();
     let pointerId: number | null = null;
-    let originX = 0;
-    let originY = 0;
-    let swiped = false;
+    let downAt = 0;
 
     const isUi = (target: EventTarget | null): boolean =>
       target instanceof Element && target.closest("button, a, input, [data-no-gesture]") !== null;
 
+    const feed = (event: PointerEvent): void => {
+      // iOS delivers touches at up to 120 Hz but may coalesce them: feed every sample, in order.
+      const samples = typeof event.getCoalescedEvents === "function" ? event.getCoalescedEvents() : [];
+      const list = samples.length > 0 ? samples : [event];
+      for (const sample of list) {
+        const direction = recognizer.move(sample.clientX, sample.clientY, sample.timeStamp);
+        if (direction) this.onDirection(direction);
+      }
+    };
+
+    const reset = (): void => {
+      pointerId = null;
+      recognizer.end();
+    };
+
     const down = (event: PointerEvent): void => {
-      if (pointerId !== null || isUi(event.target)) return;
+      if (isUi(event.target)) return;
+      // A new finger replaces a stale one (e.g. after a system gesture swallowed the old pointerup).
+      if (pointerId !== null && event.isPrimary === false) return;
       sfx.unlock();
       pointerId = event.pointerId;
-      originX = event.clientX;
-      originY = event.clientY;
-      swiped = false;
+      downAt = event.timeStamp;
+      recognizer.start(event.clientX, event.clientY, event.timeStamp);
       try {
         element.setPointerCapture(event.pointerId);
       } catch {
@@ -80,35 +92,49 @@ export class InputManager {
 
     const move = (event: PointerEvent): void => {
       if (event.pointerId !== pointerId) return;
-      const dx = event.clientX - originX;
-      const dy = event.clientY - originY;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_THRESHOLD) return;
-      swiped = true;
-      this.onDirection(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up");
-      originX = event.clientX;
-      originY = event.clientY;
+      feed(event);
     };
 
     const up = (event: PointerEvent): void => {
       if (event.pointerId !== pointerId) return;
-      pointerId = null;
+      // The lift itself is never a gesture: wobble while releasing must not steer.
+      const wasTap = recognizer.travelled < SLOP && event.timeStamp - downAt < 350;
+      reset();
       sfx.unlock();
-      if (!swiped) this.onTap();
+      if (wasTap) this.onTap();
     };
 
     const cancel = (event: PointerEvent): void => {
-      if (event.pointerId === pointerId) pointerId = null;
+      if (event.pointerId === pointerId) reset();
+    };
+
+    // iOS Safari: stop pinch-zoom, double-tap zoom, the text/callout menu and rubber banding on the play surface.
+    const block = (event: Event): void => {
+      if (!isUi(event.target)) event.preventDefault();
+    };
+    const blockTouch = (event: TouchEvent): void => {
+      if (event.cancelable && !isUi(event.target)) event.preventDefault();
     };
 
     element.addEventListener("pointerdown", down);
     element.addEventListener("pointermove", move);
     element.addEventListener("pointerup", up);
     element.addEventListener("pointercancel", cancel);
+    element.addEventListener("lostpointercapture", cancel);
+    element.addEventListener("touchmove", blockTouch, { passive: false });
+    element.addEventListener("contextmenu", block);
+    document.addEventListener("gesturestart", block as EventListener);
+    document.addEventListener("gesturechange", block as EventListener);
     return () => {
       element.removeEventListener("pointerdown", down);
       element.removeEventListener("pointermove", move);
       element.removeEventListener("pointerup", up);
       element.removeEventListener("pointercancel", cancel);
+      element.removeEventListener("lostpointercapture", cancel);
+      element.removeEventListener("touchmove", blockTouch);
+      element.removeEventListener("contextmenu", block);
+      document.removeEventListener("gesturestart", block as EventListener);
+      document.removeEventListener("gesturechange", block as EventListener);
     };
   }
 }
