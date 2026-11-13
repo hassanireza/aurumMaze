@@ -1,0 +1,12 @@
+Aurum Maze - mobile-first update
+
+1. Copy the contents of this folder over the repository root (replace same-named files).
+2. Delete these obsolete files from the repo:
+     src/components/GhostGuide.tsx
+     src/components/MazePreview.tsx
+     src/components/Navbar.tsx
+     REPLACEMENT-GUIDE.txt            (replaced by this file; optional)
+3. npm install && npm run verify && npm run build
+4. Push to main; the existing GitHub Pages workflow deploys it.
+
+package.json, package-lock.json, vite.config.ts, the workflow and the icons are unchanged.
