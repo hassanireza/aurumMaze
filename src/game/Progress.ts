@@ -9,11 +9,11 @@ export interface ProgressData {
   readonly controls: ControlScheme;
   readonly haptics: boolean;
   readonly sound: boolean;
-  readonly view: ViewMode;
+  readonly camera: ViewMode;
 }
 
 const STORAGE_KEY = "aurum-maze:v2";
-const DEFAULTS: ProgressData = { unlocked: 0, best: 0, completed: [], controls: "swipe", haptics: true, sound: true, view: "close" };
+const DEFAULTS: ProgressData = { unlocked: 0, best: 0, completed: [], controls: "swipe", haptics: true, sound: true, camera: "full" };
 
 type Listener = () => void;
 
@@ -37,7 +37,7 @@ class ProgressStore {
         controls: parsed.controls === "dpad" ? "dpad" : "swipe",
         haptics: parsed.haptics !== false,
         sound: parsed.sound !== false,
-        view: parsed.view === "full" || parsed.view === "closer" ? parsed.view : "close"
+        camera: parsed.camera === "close" || parsed.camera === "closer" ? parsed.camera : "full"
       };
     } catch {
       return DEFAULTS;
@@ -88,7 +88,7 @@ class ProgressStore {
   }
 
   public setView(view: ViewMode): void {
-    this.commit({ ...this.data, view });
+    this.commit({ ...this.data, camera: view });
   }
 
   public setSound(sound: boolean): void {

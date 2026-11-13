@@ -12,8 +12,8 @@ const M = BOARD_MARGIN;
 /** How far the drawn gold line sits inside each wall tile (tiles). Larger = wider corridors. */
 const INSET = 0.24;
 /** Characters are drawn larger than one tile, as in the arcade, so they read clearly on a phone. */
-const PAC_RADIUS = CELL * 0.64;
-const GHOST_BOX = CELL * 1.95;
+const PAC_RADIUS = CELL * 0.7;
+const GHOST_BOX = CELL * 2.1;
 
 const cx = (x: number): number => M + (x + 0.5) * CELL;
 const cy = (y: number): number => M + (y + 0.5) * CELL;

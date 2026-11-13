@@ -77,11 +77,11 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
 
   return (
     <div className="play" ref={surfaceRef}>
-      {hud ? <Hud snapshot={hud} onPause={() => engine()?.pause()} onZoom={() => progressStore.setView(progress.view === "full" ? "close" : progress.view === "close" ? "closer" : "full")} /> : <header className="hud" />}
+      {hud ? <Hud snapshot={hud} onPause={() => engine()?.pause()} onZoom={() => progressStore.setView(progress.camera === "full" ? "close" : progress.camera === "close" ? "closer" : "full")} /> : <header className="hud" />}
 
       <div className="play-main">
       <div className="play-board">
-        <GameCanvas events={events} options={options} engineRef={engineRef} view={progress.view} />
+        <GameCanvas events={events} options={options} engineRef={engineRef} view={progress.camera} />
 
         {mode === "clearing" ? <div className="toast" role="status">Round {round} cleared</div> : null}
 
@@ -135,7 +135,7 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
           controls={progress.controls}
           haptics={progress.haptics}
           sound={progress.sound}
-          view={progress.view}
+          view={progress.camera}
           onView={v => progressStore.setView(v)}
           onResume={() => engine()?.resume()}
           onRestart={() => engine()?.restartLevel()}
