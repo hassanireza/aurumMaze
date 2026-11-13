@@ -1,11 +1,11 @@
 {
   "name": "Aurum Maze",
   "short_name": "Aurum Maze",
-  "description": "Fifty luminous rounds of gold-line arcade chase.",
+  "description": "256 rounds of the original arcade maze chase, redrawn in gold line.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#050505",
   "theme_color": "#050505",
   "icons": [
