@@ -4,16 +4,14 @@ import type { GhostMotionMode, HudSnapshot } from "../game/types";
 import { GhostArt } from "./GhostArt";
 
 const LABELS: Readonly<Record<GhostMotionMode, string>> = {
-  house: "Waiting",
-  scatter: "Scatter",
-  chase: "Hunting",
-  frightened: "Afraid",
-  eaten: "Eyes"
+  house: "waiting",
+  scatter: "scattering",
+  chase: "hunting",
+  frightened: "frightened",
+  eaten: "returning"
 };
 
-const NAMES = { blinky: "Blinky", pinky: "Pinky", inky: "Inky", clyde: "Clyde" } as const;
-
-/** Live ghost status: teaches the mode cycle while you play. */
+/** Four small chips: which ghost is doing what, plus the frightened countdown. */
 export function GhostTray({ snapshot }: { readonly snapshot: HudSnapshot }): JSX.Element {
   return (
     <section className="tray" aria-label="Ghost status">
@@ -22,10 +20,9 @@ export function GhostTray({ snapshot }: { readonly snapshot: HudSnapshot }): JSX
           const status = snapshot.ghosts.find(g => g.id === id);
           const mode: GhostMotionMode = status?.mode ?? "house";
           return (
-            <li key={id} className={`tray-ghost mode-${mode}`}>
-              <GhostArt id={id} size={34} afraid={mode === "frightened"} />
-              <span className="tray-name">{NAMES[id]}</span>
-              <span className="tray-mode">{LABELS[mode]}</span>
+            <li key={id} className={`tray-ghost mode-${mode}`} aria-label={`${id} ${LABELS[mode]}`}>
+              <GhostArt id={id} size={28} afraid={mode === "frightened"} />
+              <i className="tray-dot" />
             </li>
           );
         })}

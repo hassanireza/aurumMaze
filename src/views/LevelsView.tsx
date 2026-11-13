@@ -1,48 +1,70 @@
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
+import { FruitIcon } from "../components/FruitIcon";
 import { Icon } from "../components/Icons";
-import { MazePreview } from "../components/MazePreview";
-import { LEVELS } from "../game/levels";
+import { fruitForLevel } from "../game/difficulty";
+import { TOTAL_LEVELS } from "../game/levels";
 import type { ProgressData } from "../game/Progress";
 import { playHref } from "../router";
 
+const PER_PAGE = 20;
+const PAGES = Math.ceil(TOTAL_LEVELS / PER_PAGE);
+
+/** 20 rounds per page, five rows of four: always on one screen. */
 export function LevelsView({ progress }: { readonly progress: ProgressData }): JSX.Element {
+  const [page, setPage] = useState(Math.floor(progress.unlocked / PER_PAGE));
   const completed = new Set(progress.completed);
+  const first = page * PER_PAGE;
+  const last = Math.min(TOTAL_LEVELS, first + PER_PAGE);
+  const indices = Array.from({ length: last - first }, (_, i) => first + i);
+
   return (
-    <div className="page levels">
-      <header className="page-head">
-        <p className="eyebrow">One board · 256 rounds</p>
-        <h1>Arcade Run</h1>
-        <p className="lede">{progress.completed.length} of 255 rounds cleared. Each round reuses the same board; round 256 is the famous broken kill screen.</p>
+    <div className="screen levels">
+      <header className="screen-head">
+        <p className="eyebrow">{progress.completed.length} of {TOTAL_LEVELS - 1} cleared</p>
+        <h1>Rounds</h1>
       </header>
-      <section className="world" aria-label="Pac-Man arcade rounds">
-          <ul className="level-grid">
-          {LEVELS.map((level, index) => {
-              const locked = index > progress.unlocked;
-              const done = completed.has(index);
-              const current = index === progress.unlocked && !done;
-              const inner = (
-                <>
-                  {index === 255 ? <span className="kill-preview" aria-hidden="true">256</span> : <MazePreview level={level} />}
-                  <span className="lv-num">{index + 1}</span>
-                  <span className="lv-name">{index === 255 ? "Kill screen" : "Arcade maze"}</span>
-                  <span className="lv-state" aria-hidden="true">
-                    {locked ? <Icon name="lock" size={16} /> : done ? <Icon name="check" size={16} /> : <Icon name="play" size={14} />}
-                  </span>
-                </>
-              );
-              const cls = `lv${locked ? " lv-locked" : ""}${done ? " lv-done" : ""}${current ? " lv-current" : ""}`;
-              return (
-                <li key={index}>
-                  {locked ? (
-                    <div className={cls} aria-label={`Level ${index + 1}, ${level.name}, locked`}>{inner}</div>
-                  ) : (
-                    <a className={cls} href={playHref(index)} aria-label={`Level ${index + 1}, ${level.name}${done ? ", cleared" : ""}`}>{inner}</a>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-      </section>
+
+      <ul className="level-grid">
+        {indices.map(index => {
+          const locked = index > progress.unlocked;
+          const done = completed.has(index);
+          const current = index === progress.unlocked && !done;
+          const kill = index === TOTAL_LEVELS - 1;
+          const cls = `lv${locked ? " lv-locked" : ""}${done ? " lv-done" : ""}${current ? " lv-current" : ""}${kill ? " lv-kill" : ""}`;
+          const inner = (
+            <>
+              <span className="lv-art" aria-hidden="true">
+                {kill ? <b>?!</b> : <FruitIcon name={fruitForLevel(index).name} size={30} />}
+              </span>
+              <span className="lv-num">{index + 1}</span>
+              <span className="lv-state" aria-hidden="true">
+                {locked ? <Icon name="lock" size={14} /> : done ? <Icon name="check" size={14} /> : null}
+              </span>
+            </>
+          );
+          return (
+            <li key={index}>
+              {locked ? (
+                <div className={cls} aria-label={`Round ${index + 1}, locked`}>{inner}</div>
+              ) : (
+                <a className={cls} href={playHref(index)} aria-label={`Round ${index + 1}${done ? ", cleared" : ""}`}>{inner}</a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      <nav className="pager" aria-label="Round pages">
+        <button type="button" className="icon-btn" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous rounds">
+          <Icon name="chevron-left" />
+        </button>
+        <button type="button" className="pager-now" onClick={() => setPage(Math.floor(progress.unlocked / PER_PAGE))}>
+          {first + 1}–{last}
+        </button>
+        <button type="button" className="icon-btn" onClick={() => setPage(p => Math.min(PAGES - 1, p + 1))} disabled={page === PAGES - 1} aria-label="Next rounds">
+          <Icon name="chevron-right" />
+        </button>
+      </nav>
     </div>
   );
 }

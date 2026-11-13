@@ -1,4 +1,5 @@
 import type { DirectionName } from "./types";
+import { sfx } from "./Sfx";
 
 const KEY_MAP: Readonly<Record<string, DirectionName>> = {
   ArrowLeft: "left",
@@ -16,7 +17,7 @@ const KEY_MAP: Readonly<Record<string, DirectionName>> = {
 };
 
 /** Pixels of finger travel that count as one swipe. Small = snappy. */
-const SWIPE_THRESHOLD = 14;
+const SWIPE_THRESHOLD = 12;
 
 /**
  * Keyboard and swipe-anywhere input. Gestures are *continuous*: after each
@@ -36,6 +37,7 @@ export class InputManager {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      sfx.unlock();
       const mapped = KEY_MAP[event.key];
       if (mapped) {
         event.preventDefault();
@@ -64,6 +66,7 @@ export class InputManager {
 
     const down = (event: PointerEvent): void => {
       if (pointerId !== null || isUi(event.target)) return;
+      sfx.unlock();
       pointerId = event.pointerId;
       originX = event.clientX;
       originY = event.clientY;
@@ -89,6 +92,7 @@ export class InputManager {
     const up = (event: PointerEvent): void => {
       if (event.pointerId !== pointerId) return;
       pointerId = null;
+      sfx.unlock();
       if (!swiped) this.onTap();
     };
 

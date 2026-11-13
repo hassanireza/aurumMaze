@@ -7,8 +7,7 @@ const LOOKAHEAD_TILES = 4;
 /**
  * Pinky - The Ambusher. Aims four tiles ahead of Pac-Man's heading to cut him
  * off. Faithful to the arcade quirk: when Pac-Man faces up she aims four tiles
- * up *and* four tiles left. When frightened she flees to whichever corner is
- * farthest from Pac-Man instead of wandering.
+ * up *and* four tiles left.
  */
 export class PinkyGhost extends Ghost {
   public readonly id: GhostId = "pinky";
@@ -17,7 +16,7 @@ export class PinkyGhost extends Ghost {
   protected readonly scatterCorner: GridPoint = HOME_CORNERS.pinky;
 
   public constructor() {
-    super(GHOST_STARTS.pinky, DIRECTIONS.up, "house");
+    super(GHOST_STARTS.pinky, DIRECTIONS.down, "house");
   }
 
   protected getChaseTarget(context: GhostContext): GridPoint {
@@ -25,22 +24,8 @@ export class PinkyGhost extends Ghost {
     const facing = pacman.facing;
     const quirk = facing === DIRECTIONS.up ? -LOOKAHEAD_TILES : 0;
     return {
-      x: pacman.x + facing.x * LOOKAHEAD_TILES + quirk,
-      y: pacman.y + facing.y * LOOKAHEAD_TILES
+      x: pacman.tileX + facing.x * LOOKAHEAD_TILES + quirk,
+      y: pacman.tileY + facing.y * LOOKAHEAD_TILES
     };
-  }
-
-  protected override getFrightenedTarget(context: GhostContext): GridPoint | null {
-    const { pacman } = context;
-    let best: GridPoint = HOME_CORNERS.blinky;
-    let bestDistance = -1;
-    for (const corner of Object.values(HOME_CORNERS)) {
-      const d = (corner.x - pacman.x) ** 2 + (corner.y - pacman.y) ** 2;
-      if (d > bestDistance) {
-        bestDistance = d;
-        best = corner;
-      }
-    }
-    return best;
   }
 }

@@ -1,5 +1,5 @@
 import { useId, type JSX } from "react";
-import { EYE_INK, EYE_WHITE, FRIGHT_MOUTH, GHOST_ART } from "../game/ghostArt";
+import { EYE_INK, EYE_WHITE, FRIGHT_BODY, FRIGHT_MOUTH, GHOST_ART } from "../game/ghostArt";
 import type { GhostId } from "../game/types";
 
 interface GhostArtProps {
@@ -17,9 +17,9 @@ export function GhostArt({ id, size = 64, look = [1, 0], afraid = false, classNa
   const uid = useId().replace(/:/g, "");
   const gradient = `gh-${id}-${uid}`;
   const clip = `gc-${id}-${uid}`;
-  const body = afraid ? "#6c7ca3" : art.color;
-  const light = afraid ? "#97a6cc" : art.light;
-  const shade = afraid ? "#3e4a6e" : art.shade;
+  const body = afraid ? FRIGHT_BODY.body : art.color;
+  const light = afraid ? FRIGHT_BODY.light : art.light;
+  const shade = afraid ? FRIGHT_BODY.shade : art.shade;
 
   return (
     <svg

@@ -38,9 +38,9 @@ export interface GhostArt {
 export const GHOST_ART: Readonly<Record<GhostId, GhostArt>> = {
   blinky: {
     id: "blinky",
-    color: "#d4af37",
-    shade: "#8a6f16",
-    light: "#f1d98a",
+    color: "#e5503f",
+    shade: "#8e2118",
+    light: "#ff8f7d",
     body: "M14 88 L14 48 L24 22 L38 40 L50 10 L62 40 L76 22 L86 48 L86 88 L74 76 L62 88 L50 76 L38 88 L26 76 Z",
     detail: "M16 47 Q50 36 84 47",
     eyes: [
@@ -51,9 +51,9 @@ export const GHOST_ART: Readonly<Record<GhostId, GhostArt>> = {
   },
   pinky: {
     id: "pinky",
-    color: "#e7c8d9",
-    shade: "#9a6f88",
-    light: "#f8e6f0",
+    color: "#f2a9cf",
+    shade: "#a24f7c",
+    light: "#ffd9ec",
     body: "M18 86 L18 54 C18 32 32 18 50 5 C68 18 82 32 82 54 L82 86 Q74 97 66 86 Q58 75 50 86 Q42 97 34 86 Q26 75 18 86 Z",
     detail: "M30 82 L30 56 C30 41 40 29 50 20 C60 29 70 41 70 56 L70 82",
     eyes: [
@@ -64,9 +64,9 @@ export const GHOST_ART: Readonly<Record<GhostId, GhostArt>> = {
   },
   inky: {
     id: "inky",
-    color: "#9fd8d3",
-    shade: "#4d8b86",
-    light: "#d4f2ee",
+    color: "#6fd8d0",
+    shade: "#2f8a84",
+    light: "#c3f5f0",
     body: "M14 88 L14 52 C14 30 26 22 38 24 C44 25 48 29 50 36 C52 29 56 25 62 24 C74 22 86 30 86 52 L86 88 L74 88 L74 80 L62 80 L62 88 L38 88 L38 80 L26 80 L26 88 Z",
     detail: "M50 38 L50 78",
     split: true,
@@ -77,9 +77,9 @@ export const GHOST_ART: Readonly<Record<GhostId, GhostArt>> = {
   },
   clyde: {
     id: "clyde",
-    color: "#e3a05e",
-    shade: "#8f5a24",
-    light: "#f6cd9c",
+    color: "#f0a04b",
+    shade: "#97541a",
+    light: "#ffd39b",
     body: "M15 86 L15 58 C15 33 31 20 50 20 C69 20 85 33 85 58 L85 86 Q76 77 67.5 86 Q59 77 50 86 Q41 77 32.5 86 Q24 77 15 86 Z",
     detail: "M26 70 Q50 82 74 70",
     accessory: "M43 14 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0 Z",
@@ -96,3 +96,4 @@ export const GHOST_ORDER: readonly GhostId[] = ["blinky", "pinky", "inky", "clyd
 export const FRIGHT_MOUTH = "M30 72 L38 64 L46 72 L54 64 L62 72 L70 64";
 export const EYE_INK = "#0b0b0d";
 export const EYE_WHITE = "#f7f3e8";
+export const FRIGHT_BODY = { body: "#3f56d9", light: "#7f93ff", shade: "#1c2a8c" } as const;

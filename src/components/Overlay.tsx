@@ -7,12 +7,11 @@ interface OverlayProps {
   readonly actions: ReactNode;
 }
 
-/** Centered card shown on top of the board for level-clear, game-over and victory. */
+/** Centered card shown on top of the board for game-over and the kill screen. */
 export function Overlay({ eyebrow, title, children, actions }: OverlayProps): JSX.Element {
   return (
-    <div className="overlay" role="dialog" aria-modal="false" aria-label={title}>
+    <div className="overlay" role="dialog" aria-modal="false" aria-label={title} data-no-gesture>
       <div className="overlay-card">
-        <div className="monogram" aria-hidden="true">AM</div>
         <p className="eyebrow">{eyebrow}</p>
         <h2>{title}</h2>
         {children ? <div className="overlay-body">{children}</div> : null}

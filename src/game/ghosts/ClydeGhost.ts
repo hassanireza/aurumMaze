@@ -8,7 +8,7 @@ export const CLYDE_SHYNESS_RADIUS = 8;
 /**
  * Clyde - The Shy One. Chases like Blinky from afar, but loses his nerve
  * inside eight tiles and bolts for his home corner, producing a hesitant,
- * looping patrol. When frightened he hides in that same corner.
+ * looping patrol.
  */
 export class ClydeGhost extends Ghost {
   public readonly id: GhostId = "clyde";
@@ -17,17 +17,13 @@ export class ClydeGhost extends Ghost {
   protected readonly scatterCorner: GridPoint = HOME_CORNERS.clyde;
 
   public constructor() {
-    super(GHOST_STARTS.clyde, DIRECTIONS.up, "house");
+    super(GHOST_STARTS.clyde, DIRECTIONS.down, "house");
   }
 
   protected getChaseTarget(context: GhostContext): GridPoint {
     const { pacman } = context;
-    const d = Math.hypot(this.x - pacman.x, this.y - pacman.y);
+    const d = Math.hypot(this.tileX - pacman.tileX, this.tileY - pacman.tileY);
     if (d < CLYDE_SHYNESS_RADIUS) return this.scatterCorner;
-    return { x: pacman.x, y: pacman.y };
-  }
-
-  protected override getFrightenedTarget(): GridPoint | null {
-    return this.scatterCorner;
+    return { x: pacman.tileX, y: pacman.tileY };
   }
 }
