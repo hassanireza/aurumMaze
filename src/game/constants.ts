@@ -40,7 +40,7 @@ export const GRID_HEIGHT = 31;
 /** Logical drawing units per tile; the canvas is scaled to the screen from these. */
 export const CELL_SIZE = 24;
 /** Breathing room around the maze so the outer glow is never clipped. */
-export const BOARD_MARGIN = 10;
+export const BOARD_MARGIN = 6;
 export const CANVAS_WIDTH = GRID_WIDTH * CELL_SIZE + BOARD_MARGIN * 2;
 export const CANVAS_HEIGHT = GRID_HEIGHT * CELL_SIZE + BOARD_MARGIN * 2;
 
