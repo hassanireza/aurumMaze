@@ -1,6 +1,6 @@
 import type { DirectionName } from "./types";
 import { sfx } from "./Sfx";
-import { SLOP, SwipeRecognizer } from "./SwipeRecognizer";
+import { FIRST_STROKE, SwipeRecognizer } from "./SwipeRecognizer";
 
 const KEY_MAP: Readonly<Record<string, DirectionName>> = {
   ArrowLeft: "left",
@@ -65,7 +65,7 @@ export class InputManager {
       const samples = typeof event.getCoalescedEvents === "function" ? event.getCoalescedEvents() : [];
       const list = samples.length > 0 ? samples : [event];
       for (const sample of list) {
-        const direction = recognizer.move(sample.clientX, sample.clientY, sample.timeStamp);
+        const direction = recognizer.move(sample.clientX, sample.clientY);
         if (direction) this.onDirection(direction);
       }
     };
@@ -82,7 +82,7 @@ export class InputManager {
       sfx.unlock();
       pointerId = event.pointerId;
       downAt = event.timeStamp;
-      recognizer.start(event.clientX, event.clientY, event.timeStamp);
+      recognizer.start(event.clientX, event.clientY);
       try {
         element.setPointerCapture(event.pointerId);
       } catch {
@@ -98,7 +98,7 @@ export class InputManager {
     const up = (event: PointerEvent): void => {
       if (event.pointerId !== pointerId) return;
       // The lift itself is never a gesture: wobble while releasing must not steer.
-      const wasTap = recognizer.travelled < SLOP && event.timeStamp - downAt < 350;
+      const wasTap = recognizer.travelled < FIRST_STROKE && event.timeStamp - downAt < 350;
       reset();
       sfx.unlock();
       if (wasTap) this.onTap();

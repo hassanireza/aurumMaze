@@ -55,13 +55,17 @@ export const ALL_GHOSTS_BONUS = 12000;
 export const EXTRA_LIFE_AT = 10000;
 
 /**
- * How long (seconds) a swipe/keypress waits for a legal corner before it is
- * forgotten. Long enough to feel forgiving, short enough that a stale swipe
- * never throws you around a corner you forgot about.
+ * Steering forgiveness, tuned for thumbs:
+ *  - a turn pressed up to TURN_LATE tiles AFTER a junction still takes it (people swipe when they
+ *    see the corner, which is already late),
+ *  - a turn pressed up to TURN_EARLY tiles before one takes it right away,
+ *  - anything earlier is remembered, but only for TURN_BUFFER_SECONDS or TURN_BUFFER_TILES of
+ *    travel, whichever ends first, so a stale swipe never throws you around a corner later.
  */
-export const TURN_BUFFER_SECONDS = 0.7;
-/** A turn pressed this close (in tiles) before OR after a junction still takes it. */
-export const TURN_WINDOW = 0.55;
+export const TURN_EARLY = 0.45;
+export const TURN_LATE = 0.7;
+export const TURN_BUFFER_SECONDS = 0.55;
+export const TURN_BUFFER_TILES = 3.2;
 
 /** Entity coordinates are tile centres; half-tile values sit on the board's centre line. */
 export const PACMAN_START: GridPoint = Object.freeze({ x: 13.5, y: 23 });

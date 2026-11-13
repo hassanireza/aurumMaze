@@ -1,5 +1,5 @@
 import { Entity } from "./Entity";
-import { DIRECTIONS, TURN_BUFFER_SECONDS, TURN_WINDOW, oppositeOf } from "./constants";
+import { DIRECTIONS, GRID_WIDTH, TURN_BUFFER_SECONDS, TURN_BUFFER_TILES, TURN_EARLY, TURN_LATE, oppositeOf } from "./constants";
 import type { DirectionVector, GridPoint } from "./types";
 import type { Maze } from "./Maze";
 
@@ -8,14 +8,15 @@ import type { Maze } from "./Maze";
  * in his current direction until a wall stops him; input only *steers*.
  *
  * Mobile-friendly steering on top of that:
- *  - a turn is accepted up to TURN_WINDOW tiles before OR after a junction
- *    (the arcade's "cornering" made generous),
- *  - a swipe made earlier than that is remembered for TURN_BUFFER_SECONDS,
+ *  - a turn is accepted TURN_LATE tiles after a junction (thumbs are late) or TURN_EARLY
+ *    tiles before one,
+ *  - an earlier swipe is remembered briefly (time and distance limited),
  *  - reversing is instant, anywhere.
  */
 export class PacMan extends Entity {
   private queued: DirectionVector = DIRECTIONS.none;
   private queueAge = 0;
+  private queueOdometer = 0;
   private odometer = 0;
   private moving = false;
   private stall = 0;
@@ -28,6 +29,7 @@ export class PacMan extends Entity {
     if (direction === DIRECTIONS.none) return;
     this.queued = direction;
     this.queueAge = 0;
+    this.queueOdometer = this.odometer;
   }
 
   public get facing(): DirectionVector {
@@ -61,7 +63,11 @@ export class PacMan extends Entity {
     void maze;
   }
 
-  /** Executes a queued turn when close enough to a junction centre. Returns true when it turned. */
+  /**
+   * Executes a queued turn when a junction that allows it is close enough: the one just passed
+   * (up to TURN_LATE behind) or the one just ahead (up to TURN_EARLY). The nearer legal one wins.
+   * Returns true when it turned.
+   */
   private tryTurn(maze: Maze, onCenterReached: (x: number, y: number) => void): boolean {
     const q = this.queued;
     if (q === DIRECTIONS.none) return false;
@@ -69,20 +75,34 @@ export class PacMan extends Entity {
       this.queued = DIRECTIONS.none;
       return false;
     }
-    const along = this.direction.x !== 0 ? this.px : this.py;
-    const offset = Math.abs(along - Math.round(along));
-    // Standing still against a wall: the heading is meaningless, any open way is fine.
-    const idle = !maze.canStep(Math.round(this.px), Math.round(this.py), this.direction) && offset < 1e-6;
-    if (offset > TURN_WINDOW && !idle) return false;
-    const cx = this.direction.x !== 0 ? Math.round(this.px) : Math.round(this.px);
-    const cy = Math.round(this.py);
-    // Off-axis (mid-tile on the other axis) can never happen: we are always on a corridor line.
-    if (!maze.canStep(cx, cy, q)) return false;
-    this.snapTo(cx, cy);
-    this.direction = q;
-    this.queued = DIRECTIONS.none;
-    onCenterReached(cx, cy);
-    return true;
+    const horizontal = this.direction.x !== 0;
+    const sign = horizontal ? this.direction.x : this.direction.y;
+    const along = horizontal ? this.px : this.py;
+    const behind = sign > 0 ? Math.floor(along + 1e-6) : Math.ceil(along - 1e-6);
+    const distBehind = Math.abs(along - behind);
+    const ahead = behind + sign;
+    const distAhead = Math.abs(ahead - along);
+    const wrap = (v: number): number => (horizontal ? ((v % GRID_WIDTH) + GRID_WIDTH) % GRID_WIDTH : v);
+    const fixed = horizontal ? Math.round(this.py) : Math.round(this.px);
+    const tile = (v: number): { x: number; y: number } => (horizontal ? { x: wrap(v), y: fixed } : { x: fixed, y: v });
+    const stopped = !maze.canStep(Math.round(this.px) % GRID_WIDTH, Math.round(this.py), this.direction) && distBehind < 1e-6;
+
+    const options: { dist: number; center: number }[] = [];
+    if (distBehind <= TURN_LATE || stopped) options.push({ dist: distBehind, center: behind });
+    if (distAhead <= TURN_EARLY) options.push({ dist: distAhead, center: ahead });
+    options.sort((a, b) => a.dist - b.dist);
+    for (const option of options) {
+      const t = tile(option.center);
+      if (!maze.canStep(t.x, t.y, q)) continue;
+      if (horizontal) this.snapTo(option.center, t.y);
+      else this.snapTo(t.x, option.center);
+      this.px = wrap(this.px);
+      this.direction = q;
+      this.queued = DIRECTIONS.none;
+      onCenterReached(t.x, t.y);
+      return true;
+    }
+    return false;
   }
 
   public update(
@@ -94,7 +114,7 @@ export class PacMan extends Entity {
     this.decaySlide(dt);
     if (this.queued !== DIRECTIONS.none) {
       this.queueAge += dt;
-      if (this.queueAge > TURN_BUFFER_SECONDS) this.queued = DIRECTIONS.none;
+      if (this.queueAge > TURN_BUFFER_SECONDS || this.odometer - this.queueOdometer > TURN_BUFFER_TILES) this.queued = DIRECTIONS.none;
     }
     this.tryReverse(maze);
     this.tryTurn(maze, onTile);
