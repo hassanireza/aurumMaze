@@ -9,16 +9,15 @@ interface TabBarProps {
 }
 
 /**
- * Mobile navigation: a four-item bottom tab bar inside the thumb zone.
- * Play is the emphasised centre-of-gravity action; the bar disappears during
- * a run so the maze gets the whole screen.
+ * Bottom tab bar inside the thumb zone. Play is the emphasised action; the
+ * bar disappears during a run so the maze gets the whole screen.
  */
 export function TabBar({ route, continueLevel }: TabBarProps): JSX.Element {
   const items = [
-    { href: "#/", label: "Home", icon: "home" as const, on: route.name === "home" && route.section === "top" },
+    { href: "#/", label: "Home", icon: "home" as const, on: route.name === "home" },
     { href: playHref(continueLevel), label: "Play", icon: "play" as const, on: false, primary: true },
-    { href: "#/levels", label: "Levels", icon: "levels" as const, on: route.name === "levels" },
-    { href: "#/ghosts", label: "Ghosts", icon: "ghost" as const, on: route.name === "home" && route.section === "ghosts" }
+    { href: "#/levels", label: "Rounds", icon: "levels" as const, on: route.name === "levels" },
+    { href: "#/ghosts", label: "Ghosts", icon: "ghost" as const, on: route.name === "ghosts" }
   ];
   return (
     <nav className="tabbar" aria-label="Primary">
@@ -26,7 +25,7 @@ export function TabBar({ route, continueLevel }: TabBarProps): JSX.Element {
         <a
           key={item.label}
           href={item.href}
-          className={`tab${item.on ? " tab-on" : ""}${item.primary ? " tab-primary" : ""}`}
+          className={`tab${item.on ? " tab-on" : ""}${"primary" in item && item.primary ? " tab-primary" : ""}`}
           aria-current={item.on ? "page" : undefined}
         >
           <span className="tab-icon"><Icon name={item.icon} size={22} /></span>
