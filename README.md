@@ -71,7 +71,7 @@
 | **Play** | The game | Maze uses the full screen width. Lives, ghost moods and fruit sit directly below it |
 | **Rounds** | Pick any unlocked round | Twenty rounds per page in a four by five grid, each with its fruit |
 | **Ghosts** | Learn how each ghost hunts | One ghost per screen. Swipe sideways, tap a face to jump |
-| **Pause** | Controls, sound, haptics, exit | A bottom sheet in the thumb zone |
+| **Pause** | View, controls, sound, haptics, exit | A bottom sheet in the thumb zone |
 
 ---
 
@@ -106,10 +106,11 @@
 
 <img src="assets/icons/swipe.svg" width="20" height="20" align="absmiddle" alt=""/> **Touch first controls**
 - Swipe anywhere, chain swipes
-- 0.55 tile turn window
-- 0.7 s turn buffer
-- Instant reverse
+- Tangent based swipe reading, no misfires from thumb roll
+- Turns taken 0.7 tile late or 0.45 early
+- Instant reverse on a deliberate stroke
 - Optional D-pad that fires on press
+- Three views: Full maze, Close and Closer, a camera that follows Pac-Man
 
 </td>
 <td width="50%" valign="top">
@@ -197,15 +198,18 @@ The layout lives in `src/game/arcadeMaze.ts` as plain text rows. Walls are trace
 
 <div align="center">
 
-<img src="assets/steering.svg" width="100%" alt="A swipe pressed within 0.55 tile of a junction centre is taken immediately."/>
+<img src="assets/steering.svg" width="100%" alt="A swipe pressed 0.45 tile before or 0.7 tile after a junction centre is taken at the junction."/>
 
 </div>
 
 Pac-Man keeps moving until a wall stops him, exactly as in the arcade. Input only steers.
 
-- **Turn window.** A perpendicular turn is accepted up to 0.55 tile before or after the junction centre. The sprite eases onto the new line so there is no visible jump.
-- **Turn buffer.** A swipe made earlier is remembered for 0.7 seconds and taken at the next legal junction.
-- **Instant reverse.** The opposite direction is applied at once, anywhere.
+- **Direction from the finger's path.** The recognizer reads the tangent of the last 16 to 18 px of finger travel, not the distance from where the thumb landed. Thumb landing roll, arcing strokes and wobble while lifting never count as commands.
+- **Undecided is not guessed.** Strokes near 45 degrees fire nothing until one axis clearly wins.
+- **Reversing is deliberate.** A 90 degree turn needs an 18 px straight stroke, the opposite direction needs 30 px, and the lift is never a gesture.
+- **Late turns count.** A turn pressed up to 0.7 tile after a junction still takes it, and one pressed up to 0.45 tile before it takes it at once.
+- **Short buffer.** An earlier swipe is kept for 0.55 s or 3.2 tiles of travel, then forgotten, so it never fires at a corner you forgot about.
+- **Intent arrow.** A small arrow beside Pac-Man shows the turn the game understood until it is carried out.
 - **Eating costs time.** Pac-Man pauses one frame per dot and three per power pellet, as in the arcade.
 - **Forgiving collisions.** A ghost catches you at 0.55 tile, while you catch a frightened ghost at 0.8 tile.
 
@@ -313,16 +317,19 @@ Open the address Vite prints. The base path is `/aurumMaze/`, so locally the gam
 | Swipe anywhere | Steer, chain swipes without lifting |
 | Arrow keys or WASD | Steer on a keyboard |
 | Space, P or Esc | Pause and resume |
-| Pause sheet | Switch to D-pad, toggle sound and haptics |
+| Zoom button | Cycle Full, Close and Closer views |
+| Pause sheet | Pick the view, switch to D-pad, toggle sound and haptics |
 
 ### Verification
 
 `npm run verify` runs without a browser and checks that:
 
 - the maze is 28 by 31, left and right symmetric, fully connected, with 244 dots and a two tile gate
-- Pac-Man steers, reverses instantly, wraps through the tunnel and never leaves the corridor grid
+- Pac-Man steers, takes late and early turns, forgets stale swipes, wraps through the tunnel and never leaves the corridor grid
+- the swipe recognizer ignores landing roll, arcs and lift jitter
 - an eaten ghost finds the ghost house from every tile of the maze
 - five random soak runs keep every ghost on valid corridors, including round 256
+- no tile is a dead end or a pocket, and every walkable tile is reachable
 - the speed, frightened time, house limit and fruit tables match the arcade
 
 ### Saved data
