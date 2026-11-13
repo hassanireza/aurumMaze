@@ -17,20 +17,20 @@ export class InkyGhost extends Ghost {
   protected readonly scatterCorner: GridPoint = HOME_CORNERS.inky;
 
   public constructor() {
-    super(GHOST_STARTS.inky, DIRECTIONS.up, "house");
+    super(GHOST_STARTS.inky, DIRECTIONS.down, "house");
   }
 
   protected getChaseTarget(context: GhostContext): GridPoint {
-    const { pacman, blinkyCell } = context;
+    const { pacman, blinkyTile } = context;
     const facing = pacman.facing;
     const quirk = facing === DIRECTIONS.up ? -PIVOT_TILES : 0;
     const pivot = {
-      x: pacman.x + facing.x * PIVOT_TILES + quirk,
-      y: pacman.y + facing.y * PIVOT_TILES
+      x: pacman.tileX + facing.x * PIVOT_TILES + quirk,
+      y: pacman.tileY + facing.y * PIVOT_TILES
     };
     return {
-      x: pivot.x * 2 - blinkyCell.x,
-      y: pivot.y * 2 - blinkyCell.y
+      x: pivot.x * 2 - blinkyTile.x,
+      y: pivot.y * 2 - blinkyTile.y
     };
   }
 }
