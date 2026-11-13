@@ -1,9 +1,10 @@
 import type { DirectionVector, GridPoint, LevelDefinition } from "./types";
-import { ALL_DIRECTIONS, DIRECTIONS, TUNNEL_ROW } from "./constants";
+import { GRID_WIDTH, TUNNEL_ROW, isTunnelColumn } from "./constants";
 
 /**
  * One maze layout. Glyphs: `#` wall, `.` pellet, `o` power pellet, ` ` empty
- * path, `h` ghost-house floor (ghosts only), `-` house gate.
+ * path, `h` ghost-house floor, `-` ghost-house gate. Only the scripted ghost
+ * house logic ever crosses `h` / `-`; everyone else treats them as solid.
  */
 export class Maze {
   private readonly grid: string[][];
@@ -15,12 +16,6 @@ export class Maze {
 
   public constructor(definition: LevelDefinition) {
     this.grid = definition.rows.map(row => row.split(""));
-    // The ROM maze glyphs include decorative pen walls. Rebuild the walkable
-    // pen footprint as ghost-only tiles and its one-tile exit gate.
-    for (let y = 14; y <= 20; y += 1) for (let x = 11; x <= 16; x += 1) {
-      this.grid[y]![x] = "h";
-    }
-    this.grid[13]![13] = "-";
     this.rowCount = this.grid.length;
     this.columnCount = this.grid[0]?.length ?? 0;
 
@@ -38,27 +33,18 @@ export class Maze {
     this.totalPellets = pellets.size;
   }
 
-  private static key(x: number, y: number): string {
+  public static key(x: number, y: number): string {
     return `${x},${y}`;
-  }
-
-  /** Wraps x on the tunnel row; returns null when the cell is outside the board. */
-  public resolve(point: GridPoint): GridPoint | null {
-    if (point.y < 0 || point.y >= this.rowCount) return null;
-    if (point.x >= 0 && point.x < this.columnCount) return point;
-    if (point.y !== TUNNEL_ROW) return null;
-    return { x: (point.x + this.columnCount) % this.columnCount, y: point.y };
   }
 
   /** Visual corruption used by the level-256 hardware overflow; paths stay open there. */
   public corruptRightHalf(): void {
-    for (let y = 2; y < this.rowCount - 2; y += 1) {
+    for (let y = 0; y < this.rowCount; y += 1) {
       for (let x = 14; x < this.columnCount; x += 1) {
-        this.grid[y]![x] = " ";
+        const g = this.grid[y]![x]!;
+        if (g === "#" || g === "h" || g === "-") this.grid[y]![x] = " ";
       }
     }
-    // Keep original dot logic/count even though the right half is visually corrupt.
-    // Hidden pellets remain collectible as in the arcade memory-overflow state.
   }
 
   public glyph(x: number, y: number): string {
@@ -69,7 +55,7 @@ export class Maze {
     return this.glyph(x, y) === "#";
   }
 
-  public isDoor(x: number, y: number): boolean {
+  public isGate(x: number, y: number): boolean {
     return this.glyph(x, y) === "-";
   }
 
@@ -79,41 +65,27 @@ export class Maze {
   }
 
   public isTunnel(x: number, y: number): boolean {
-    return y === TUNNEL_ROW && (x <= 2 || x >= this.columnCount - 3);
+    return y === TUNNEL_ROW && isTunnelColumn(x);
   }
 
-  /** Whether an entity may stand on `point`. Only ghosts that are entering/leaving may use the house. */
-  public canEnter(point: GridPoint, allowHouse = false): boolean {
-    const cell = this.resolve(point);
-    if (!cell) return false;
-    const g = this.glyph(cell.x, cell.y);
-    if (g === "#") return false;
-    if (g === "h") return allowHouse;
-    if (g === "-") return true;
-    return true;
+  /** Can an entity standing on tile centre (x, y) step one tile in `dir`? Handles the side tunnel wrap. */
+  public canStep(x: number, y: number, dir: DirectionVector): boolean {
+    const nx = x + dir.x;
+    const ny = y + dir.y;
+    if (ny < 0 || ny >= this.rowCount) return false;
+    if (nx < 0 || nx >= this.columnCount) return ny === TUNNEL_ROW;
+    const g = this.grid[ny]![nx]!;
+    return g !== "#" && g !== "h" && g !== "-";
   }
 
-  /** Breadth-first first step from `from` to `to`; null when unreachable. */
-  public nextStep(from: GridPoint, to: GridPoint, allowHouse: boolean): DirectionVector | null {
-    if (from.x === to.x && from.y === to.y) return null;
-    const start = Maze.key(from.x, from.y);
-    const seen = new Map<string, DirectionVector>();
-    const queue: { x: number; y: number; first: DirectionVector | null }[] = [{ ...from, first: null }];
-    seen.set(start, DIRECTIONS.none);
-    for (let head = 0; head < queue.length; head += 1) {
-      const node = queue[head]!;
-      for (const dir of ALL_DIRECTIONS) {
-        const cell = this.resolve({ x: node.x + dir.x, y: node.y + dir.y });
-        if (!cell || !this.canEnter(cell, allowHouse)) continue;
-        const k = Maze.key(cell.x, cell.y);
-        if (seen.has(k)) continue;
-        const first = node.first ?? dir;
-        if (cell.x === to.x && cell.y === to.y) return first;
-        seen.set(k, first);
-        queue.push({ x: cell.x, y: cell.y, first });
-      }
-    }
-    return null;
+  /** Wraps an x tile index through the tunnel. */
+  public wrapX(x: number): number {
+    return (x + GRID_WIDTH) % GRID_WIDTH;
+  }
+
+  public canStand(point: GridPoint): boolean {
+    const g = this.glyph(point.x, point.y);
+    return g !== "#" && g !== "h" && g !== "-";
   }
 
   public get pellets(): ReadonlySet<string> {
@@ -129,8 +101,6 @@ export class Maze {
   }
 
   public consumePellet(x: number, y: number): boolean {
-    const key = Maze.key(x, y);
-    const consumed = this.pelletSet.delete(key);
-    return consumed;
+    return this.pelletSet.delete(Maze.key(x, y));
   }
 }

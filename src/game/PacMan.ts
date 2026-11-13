@@ -1,23 +1,24 @@
 import { Entity } from "./Entity";
-import { DIRECTIONS, TURN_BUFFER_SECONDS } from "./constants";
+import { DIRECTIONS, TURN_BUFFER_SECONDS, TURN_WINDOW, oppositeOf } from "./constants";
 import type { DirectionVector, GridPoint } from "./types";
 import type { Maze } from "./Maze";
 
-/** Fraction of a cell after a junction in which a late turn still "cuts the corner". */
-const CORNER_WINDOW = 0.4;
-
 /**
  * Player entity. Behaviour matches the arcade original: Pac-Man keeps gliding
- * in his current direction until a wall stops him; input only *steers*. A
- * swipe made slightly before a junction is remembered for a short moment
- * (TURN_BUFFER_SECONDS) so corners feel forgiving, then forgotten so a stale
- * input never throws you around a corner you forgot about.
+ * in his current direction until a wall stops him; input only *steers*.
+ *
+ * Mobile-friendly steering on top of that:
+ *  - a turn is accepted up to TURN_WINDOW tiles before OR after a junction
+ *    (the arcade's "cornering" made generous),
+ *  - a swipe made earlier than that is remembered for TURN_BUFFER_SECONDS,
+ *  - reversing is instant, anywhere.
  */
 export class PacMan extends Entity {
   private queued: DirectionVector = DIRECTIONS.none;
   private queueAge = 0;
-  private mouth = 0.3;
+  private odometer = 0;
   private moving = false;
+  private stall = 0;
 
   public constructor(start: GridPoint) {
     super(start, DIRECTIONS.left);
@@ -33,57 +34,87 @@ export class PacMan extends Entity {
     return this.direction;
   }
 
+  /** Half-angle of the mouth opening, radians. */
   public get mouthPhase(): number {
-    return this.mouth;
+    if (!this.moving && this.odometer === 0) return 0.5;
+    return 0.04 + Math.abs(Math.sin(this.odometer * Math.PI * 1.1)) * 0.62;
   }
 
   public get isMoving(): boolean {
     return this.moving;
   }
 
-  /** Reversing needs no junction: flip heading and keep the exact same position. */
-  private tryInstantReverse(maze: Maze): void {
-    const q = this.queued;
-    if (q === DIRECTIONS.none || this.progress <= 0) return;
-    if (q.x !== -this.direction.x || q.y !== -this.direction.y) return;
-    const ahead = maze.resolve({ x: this.x + this.direction.x, y: this.y + this.direction.y });
-    if (!ahead) return;
-    this.x = ahead.x;
-    this.y = ahead.y;
-    this.direction = q;
-    this.progress = 1 - this.progress;
-    this.queued = DIRECTIONS.none;
+  public get hasQueuedTurn(): DirectionVector {
+    return this.queued;
   }
 
-  private tryTurn(maze: Maze): void {
+  /** Eating costs time in the arcade: 1 frame per dot, 3 per power pellet. */
+  public addStall(seconds: number): void {
+    this.stall += seconds;
+  }
+
+  private tryReverse(maze: Maze): void {
     const q = this.queued;
-    if (q === DIRECTIONS.none || q === this.direction) return;
-    if (this.progress > CORNER_WINDOW) return;
-    if (!this.canMove(maze, q)) return;
-    this.turnTo(q);
+    if (q === DIRECTIONS.none || q !== oppositeOf(this.direction)) return;
+    this.direction = q;
     this.queued = DIRECTIONS.none;
+    void maze;
+  }
+
+  /** Executes a queued turn when close enough to a junction centre. Returns true when it turned. */
+  private tryTurn(maze: Maze, onCenterReached: (x: number, y: number) => void): boolean {
+    const q = this.queued;
+    if (q === DIRECTIONS.none) return false;
+    if (q === this.direction) {
+      this.queued = DIRECTIONS.none;
+      return false;
+    }
+    const along = this.direction.x !== 0 ? this.px : this.py;
+    const offset = Math.abs(along - Math.round(along));
+    // Standing still against a wall: the heading is meaningless, any open way is fine.
+    const idle = !maze.canStep(Math.round(this.px), Math.round(this.py), this.direction) && offset < 1e-6;
+    if (offset > TURN_WINDOW && !idle) return false;
+    const cx = this.direction.x !== 0 ? Math.round(this.px) : Math.round(this.px);
+    const cy = Math.round(this.py);
+    // Off-axis (mid-tile on the other axis) can never happen: we are always on a corridor line.
+    if (!maze.canStep(cx, cy, q)) return false;
+    this.snapTo(cx, cy);
+    this.direction = q;
+    this.queued = DIRECTIONS.none;
+    onCenterReached(cx, cy);
+    return true;
   }
 
   public update(
     maze: Maze,
     dt: number,
     speed: number,
-    pulse: number,
-    onPelletEaten: (isPower: boolean) => void
+    onTile: (x: number, y: number) => void
   ): void {
+    this.decaySlide(dt);
     if (this.queued !== DIRECTIONS.none) {
       this.queueAge += dt;
       if (this.queueAge > TURN_BUFFER_SECONDS) this.queued = DIRECTIONS.none;
     }
-    this.tryInstantReverse(maze);
-    this.tryTurn(maze);
+    this.tryReverse(maze);
+    this.tryTurn(maze, onTile);
 
-    const before = this.x * 1000 + this.y + this.progress;
-    this.advanceCell(maze, dt, speed, () => {
-      if (maze.consumePellet(this.x, this.y)) onPelletEaten(maze.isPowerPellet(this.x, this.y));
-      this.tryTurn(maze);
-    });
-    this.moving = this.x * 1000 + this.y + this.progress !== before;
-    this.mouth = this.moving ? 0.1 + Math.abs(Math.sin(pulse * 14)) * 0.34 : 0.22;
+    if (this.stall > 0) {
+      this.stall = Math.max(0, this.stall - dt);
+      this.moving = false;
+      return;
+    }
+
+    const moved = this.travel(
+      maze,
+      dt * speed,
+      (x, y, d) => maze.canStep(x, y, d),
+      () => {
+        onTile(this.tileX, this.tileY);
+        this.tryTurn(maze, onTile);
+      }
+    );
+    this.moving = moved > 0;
+    this.odometer += moved;
   }
 }

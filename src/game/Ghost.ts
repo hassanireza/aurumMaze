@@ -1,40 +1,34 @@
 import { Entity } from "./Entity";
-import { ALL_DIRECTIONS, DIRECTIONS, HOUSE_CENTER, HOUSE_EXIT } from "./constants";
+import { ALL_DIRECTIONS, DIRECTIONS, DOOR_Y, GATE_X, HOUSE_Y, NO_UP_TILES, oppositeOf } from "./constants";
 import type { LevelConfig } from "./difficulty";
 import type { Maze } from "./Maze";
 import type { PacMan } from "./PacMan";
 import type { Rng } from "./Rng";
-import type {
-  DirectionVector,
-  GhostId,
-  GhostMotionMode,
-  GhostPhase,
-  GridPoint,
-  HuntPhase
-} from "./types";
+import type { DirectionVector, GhostId, GhostMotionMode, GhostPhase, GridPoint, HuntPhase } from "./types";
 
 export interface GhostContext {
   readonly pacman: PacMan;
-  readonly blinkyCell: GridPoint;
+  readonly blinkyTile: GridPoint;
   readonly maze: Maze;
   readonly rng: Rng;
   readonly config: LevelConfig;
   readonly pelletsLeft: number;
+  /** False after a death until Clyde has left the house again (arcade Elroy rule). */
+  readonly elroyActive: boolean;
 }
-
-const reverse = (d: DirectionVector): DirectionVector =>
-  d === DIRECTIONS.up ? DIRECTIONS.down : d === DIRECTIONS.down ? DIRECTIONS.up : d === DIRECTIONS.left ? DIRECTIONS.right : DIRECTIONS.left;
 
 const dist2 = (a: GridPoint, b: GridPoint): number => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 
+const EYES_TARGET: GridPoint = { x: GATE_X, y: DOOR_Y };
+
 /**
  * Shared ghost skeleton modelled on the 1980 arcade rules:
- *  - a ghost only decides at tile centres, never reverses on its own,
+ *  - a ghost only decides at tile centres and never reverses on its own,
  *  - it picks the exit whose next tile is closest to its target (ties: up, left, down, right),
  *  - every scatter/chase switch and every power pellet forces one U-turn,
- *  - frightened ghosts wander randomly at half speed, eaten ghosts rush home as eyes.
- * Subclasses only describe their personality: chase target, scatter corner,
- * and how they behave when frightened.
+ *  - frightened ghosts wander randomly and slowly; eaten ghosts rush home as eyes,
+ *  - chasing ghosts may not turn upward at four fixed intersections.
+ * Subclasses only describe their personality: chase target and scatter corner.
  */
 export abstract class Ghost extends Entity {
   public abstract readonly id: GhostId;
@@ -48,39 +42,31 @@ export abstract class Ghost extends Entity {
   /** 0..1 intensity of Blinky's "rage"; always 0 for the others. */
   public rage = 0;
   public bobClock = 0;
-
-  private pendingReverse = false;
-  private steerPending = false;
+  private readonly homeX: number;
 
   protected constructor(spawn: GridPoint, direction: DirectionVector, phase: GhostPhase) {
     super(spawn, direction);
     this.phase = phase;
+    this.homeX = spawn.x;
   }
 
   /** Where this ghost aims while hunting. */
   protected abstract getChaseTarget(context: GhostContext): GridPoint;
 
-  /** Where a frightened ghost runs to; null means "wander at random". */
-  protected getFrightenedTarget(_context: GhostContext): GridPoint | null {
-    return null;
-  }
-
-  /** Extra speed for ghosts that get angrier (Blinky). */
   protected speedBonus(_context: GhostContext): number {
     return 0;
   }
 
-  /** True when this ghost refuses to go home during scatter. */
   protected ignoresScatter(_context: GhostContext): boolean {
     return false;
   }
 
-  public get cell(): GridPoint {
-    return { x: this.x, y: this.y };
+  public get tile(): GridPoint {
+    return { x: this.tileX, y: this.tileY };
   }
 
   public get displayMode(): GhostMotionMode {
-    if (this.phase === "eaten") return "eaten";
+    if (this.phase === "eaten" || this.phase === "entering") return "eaten";
     if (this.phase === "house") return "house";
     if (this.frightened) return "frightened";
     return this.huntPhase;
@@ -91,113 +77,137 @@ export abstract class Ghost extends Entity {
   }
 
   public get isEaten(): boolean {
-    return this.phase === "eaten";
+    return this.phase === "eaten" || this.phase === "entering";
   }
 
+  /** Can touch Pac-Man (outside or on the way out of the house). */
   public get isActive(): boolean {
-    return this.phase === "roam" || this.phase === "leaving";
+    return this.phase === "roam" || (this.phase === "leaving" && this.py <= DOOR_Y + 1);
   }
 
   private speed(context: GhostContext): number {
     const { config, maze } = context;
     switch (this.phase) {
       case "eaten":
-        return config.eatenSpeed;
+      case "entering":
+        return config.eyesSpeed;
       case "house":
       case "leaving":
         return config.houseSpeed;
       default:
-        if (maze.isTunnel(this.x, this.y)) return config.tunnelSpeed;
+        if (maze.isTunnel(this.tileX, this.tileY)) return config.tunnelSpeed;
         if (this.frightened) return config.frightSpeed;
-        return config.ghostSpeed + this.speedBonus(context);
+        return this.roamSpeed(context);
     }
   }
 
+  protected roamSpeed(context: GhostContext): number {
+    return context.config.ghostSpeed + this.speedBonus(context);
+  }
+
   private target(context: GhostContext): GridPoint {
-    if (this.frightened) return this.getFrightenedTarget(context) ?? this.scatterCorner;
     if (this.huntPhase === "scatter" && !this.ignoresScatter(context)) return this.scatterCorner;
     return this.getChaseTarget(context);
   }
 
-  private chooseRoamDirection(context: GhostContext): DirectionVector {
-    const { maze } = context;
-    if (this.pendingReverse) {
-      this.pendingReverse = false;
-      const back = reverse(this.direction);
-      if (this.canMove(maze, back)) return back;
-    }
-    const back = reverse(this.direction);
-    const options = ALL_DIRECTIONS.filter(dir => dir !== back && this.canMove(maze, dir));
-    if (options.length === 0) return this.canMove(maze, back) ? back : DIRECTIONS.none;
-    if (options.length === 1) return options[0]!;
+  private blockedUp(): boolean {
+    return NO_UP_TILES.some(t => t.x === this.tileX && t.y === this.tileY);
+  }
 
-    if (this.frightened && this.getFrightenedTarget(context) === null) {
-      return context.rng.pick(options);
-    }
-    const target = this.target(context);
+  private chooseDirection(context: GhostContext): DirectionVector {
+    const { maze } = context;
+    const x = this.tileX;
+    const y = this.tileY;
+    const back = oppositeOf(this.direction);
+    const eyes = this.phase === "eaten";
+    const restricted = !this.frightened && !eyes && this.blockedUp();
+    const options = ALL_DIRECTIONS.filter(
+      d => d !== back && maze.canStep(x, y, d) && !(restricted && d === DIRECTIONS.up)
+    );
+    if (options.length === 0) return maze.canStep(x, y, back) ? back : DIRECTIONS.none;
+    if (options.length === 1) return options[0]!;
+    if (this.frightened && !eyes) return context.rng.pick(options);
+
+    const target = eyes ? EYES_TARGET : this.target(context);
     let best = options[0]!;
     let bestDistance = Number.POSITIVE_INFINITY;
-    for (const dir of options) {
-      const d = dist2({ x: this.x + dir.x, y: this.y + dir.y }, target);
-      if (d < bestDistance) {
-        bestDistance = d;
-        best = dir;
+    for (const d of options) {
+      const dd = dist2({ x: x + d.x, y: y + d.y }, target);
+      if (dd < bestDistance) {
+        bestDistance = dd;
+        best = d;
       }
     }
     return best;
   }
 
-  private steerToward(maze: Maze, goal: GridPoint): void {
-    const dir = maze.nextStep(this.cell, goal, true);
-    if (dir) this.direction = dir;
+  /** Scripted house movement: returns true once the point is reached. */
+  private glide(tx: number, ty: number, distance: number): boolean {
+    const dx = tx - this.px;
+    const dy = ty - this.py;
+    const len = Math.hypot(dx, dy);
+    if (len <= distance + 1e-9) {
+      this.px = tx;
+      this.py = ty;
+      return true;
+    }
+    this.px += (dx / len) * distance;
+    this.py += (dy / len) * distance;
+    return false;
   }
 
   public update(context: GhostContext, dt: number): void {
     const { maze } = context;
     this.bobClock += dt;
-    this.canUseHouse = this.phase !== "roam";
+    this.decaySlide(dt);
+    const speed = this.speed(context);
 
     switch (this.phase) {
-      case "house":
-        return;
-      case "leaving": {
-        if (this.steerPending) {
-          this.steerPending = false;
-          this.steerToward(maze, HOUSE_EXIT);
-        }
-        this.advanceCell(maze, dt, this.speed(context), () => {
-          if (this.x === HOUSE_EXIT.x && this.y === HOUSE_EXIT.y) {
-            this.phase = "roam";
-            this.canUseHouse = false;
-            this.pendingReverse = false;
-            this.direction = this.canMove(maze, DIRECTIONS.left) ? DIRECTIONS.left : DIRECTIONS.right;
-          } else {
-            this.steerToward(maze, HOUSE_EXIT);
-          }
-        });
+      case "house": {
+        const wave = Math.sin(this.bobClock * 6.2 + this.homeX);
+        this.py = HOUSE_Y + wave * 0.32;
+        this.direction = Math.cos(this.bobClock * 6.2 + this.homeX) >= 0 ? DIRECTIONS.down : DIRECTIONS.up;
         return;
       }
-      case "eaten": {
-        if (this.steerPending) {
-          this.steerPending = false;
-          this.steerToward(maze, HOUSE_CENTER);
+      case "leaving": {
+        const d = speed * dt;
+        if (Math.abs(this.px - GATE_X) > 1e-6) {
+          this.direction = this.px < GATE_X ? DIRECTIONS.right : DIRECTIONS.left;
+          const dy = HOUSE_Y - this.py;
+          this.py += Math.sign(dy) * Math.min(Math.abs(dy), d * 0.6);
+          this.glide(GATE_X, this.py, d);
+          return;
         }
-        this.advanceCell(maze, dt, this.speed(context), () => {
-          if (this.x === HOUSE_CENTER.x && this.y === HOUSE_CENTER.y) {
-            this.phase = "leaving";
-            this.frightened = false;
-            this.steerPending = true;
-          } else {
-            this.steerToward(maze, HOUSE_CENTER);
-          }
-        });
+        this.direction = DIRECTIONS.up;
+        if (this.glide(GATE_X, DOOR_Y, d)) {
+          this.phase = "roam";
+          this.direction = DIRECTIONS.left;
+        }
+        return;
+      }
+      case "entering": {
+        this.direction = DIRECTIONS.down;
+        if (this.glide(GATE_X, HOUSE_Y, speed * dt)) {
+          this.frightened = false;
+          this.phase = "leaving";
+        }
         return;
       }
       default: {
-        if (!this.canMove(maze, this.direction)) this.direction = this.chooseRoamDirection(context);
-        this.advanceCell(maze, dt, this.speed(context), () => {
-          this.direction = this.chooseRoamDirection(context);
-        });
+        if (this.direction === DIRECTIONS.none) this.direction = DIRECTIONS.left;
+        const onCenter = (): void => {
+          if (this.phase === "eaten") {
+            const d = Math.hypot(this.px - GATE_X, this.py - DOOR_Y);
+            if (d < 0.6) {
+              this.snapTo(GATE_X, DOOR_Y);
+              this.phase = "entering";
+              this.direction = DIRECTIONS.down;
+              return;
+            }
+          }
+          this.direction = this.chooseDirection(context);
+        };
+        this.travel(maze, speed * dt, (x, y, d) => maze.canStep(x, y, d), onCenter);
       }
     }
   }
@@ -205,17 +215,16 @@ export abstract class Ghost extends Entity {
   public release(): void {
     if (this.phase !== "house") return;
     this.phase = "leaving";
-    this.steerPending = true;
   }
 
   public startFrightened(): void {
-    if (this.phase === "eaten") return;
+    if (this.isEaten) return;
     this.frightened = true;
-    if (this.phase === "roam") this.pendingReverse = true;
+    this.requestReverse();
   }
 
   public requestReverse(): void {
-    if (this.phase === "roam") this.pendingReverse = true;
+    if (this.phase === "roam") this.direction = oppositeOf(this.direction);
   }
 
   public endFrightened(): void {
@@ -225,12 +234,11 @@ export abstract class Ghost extends Entity {
   public setHuntPhase(phase: HuntPhase): void {
     if (this.huntPhase === phase) return;
     this.huntPhase = phase;
-    if (this.phase === "roam" && !this.frightened) this.pendingReverse = true;
+    if (!this.frightened) this.requestReverse();
   }
 
   public markEaten(): void {
     this.phase = "eaten";
     this.frightened = false;
-    this.steerPending = true;
   }
 }

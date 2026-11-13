@@ -9,41 +9,49 @@ import { LEVELS, TOTAL_LEVELS } from "./levels";
 import { fruitForLevel, levelConfig, type LevelConfig } from "./difficulty";
 import { Rng } from "./Rng";
 import {
+  ALL_GHOSTS_BONUS,
   DIRECTIONS,
   EXTRA_LIFE_AT,
   FIXED_STEP,
+  FRUIT_POSITION,
   GHOST_CHAIN,
-  LEVEL_CLEAR_BONUS,
   PACMAN_START,
   PELLET_SCORE,
-  PELLET_SCORE_PER_LEVEL,
   POWER_PELLET_SCORE,
   STARTING_LIVES
 } from "./constants";
 import type {
   DirectionName,
+  FruitName,
   GameMode,
   GhostId,
   HapticKind,
   HudSnapshot,
   HuntPhase,
-  Popup
+  Popup,
+  SoundName
 } from "./types";
 
-const COLLISION_RADIUS = 0.6;
-const DEATH_SECONDS = 1.5;
+/** Pac-Man and a ghost touch when their centres are this close (tiles). */
+const KILL_RADIUS = 0.55;
+/** Eating a frightened ghost is deliberately more generous than being eaten. */
+const EAT_RADIUS = 0.8;
+const DEATH_PAUSE = 0.7;
+const DEATH_SECONDS = 1.7;
 const CLEAR_SECONDS = 2.0;
-const FREEZE_SECONDS = 0.45;
-const IDLE_RELEASE_SECONDS = 3.6;
-const RELEASE_GAP_SECONDS = 0.7;
-const RELEASE_ORDER: readonly GhostId[] = ["pinky", "inky", "clyde"];
-const MAX_STEPS_PER_FRAME = 10;
+const FREEZE_SECONDS = 0.7;
+const RELEASE_GAP_SECONDS = 0.45;
+const FRUIT_SECONDS = 9.5;
+const RELEASE_ORDER: readonly ("pinky" | "inky" | "clyde")[] = ["pinky", "inky", "clyde"];
+const GLOBAL_LIMITS = { pinky: 7, inky: 17, clyde: 32 } as const;
+const MAX_STEPS_PER_FRAME = 12;
 
 export interface GameEngineEvents {
   onHudChange: (snapshot: HudSnapshot) => void;
   onLevelCleared: (levelIndex: number, score: number) => void;
   onGameEnd: (score: number, won: boolean) => void;
   onHaptic: (kind: HapticKind) => void;
+  onSound?: (name: SoundName) => void;
 }
 
 export interface GameEngineOptions {
@@ -70,15 +78,21 @@ export class GameEngine {
   private levelStartLives = STARTING_LIVES;
   private extraLifeGiven = false;
   private dotsEaten = 0;
-  private fruitVisible = 0;
-  private fruitAvailable: Set<number> = new Set();
+  private fruitTimer = 0;
+  private fruitSpawned = new Set<number>();
 
   private frightLeft = 0;
+  private frightTotal = 1;
   private chain = 0;
+  private ghostsEatenLevel = 0;
+  private powersEatenLevel = 0;
   private huntStep = 0;
   private huntTimer = 0;
   private huntPhase: HuntPhase = "scatter";
-  private eatenThisLife = 0;
+  private counters: Record<"pinky" | "inky" | "clyde", number> = { pinky: 0, inky: 0, clyde: 0 };
+  private globalActive = false;
+  private globalCount = 0;
+  private elroyActive = true;
   private idleTimer = 0;
   private sinceRelease = 0;
   private freeze = 0;
@@ -86,6 +100,7 @@ export class GameEngine {
   private clearTimer = 0;
   private accumulator = 0;
   private clock = 0;
+  private wakaToggle = false;
   private popups: Popup[] = [];
   private hudKey = "";
   private readonly completed: Set<number>;
@@ -99,11 +114,10 @@ export class GameEngine {
     this.rng = new Rng(options.seed ?? (Date.now() & 0xffffff));
     this.completed = new Set(options.completed);
     this.config = levelConfig(this.levelIndex);
-    this.maze = new Maze(LEVELS[this.levelIndex]!);
-    if (this.levelIndex === 255) this.maze.corruptRightHalf();
+    this.maze = this.buildMaze(this.levelIndex);
     this.pacman = new PacMan(PACMAN_START);
     this.ghosts = this.spawnGhosts();
-    this.beginRound();
+    this.resetPositions();
     this.emitHud(true);
   }
 
@@ -115,21 +129,35 @@ export class GameEngine {
   public getMode(): GameMode { return this.mode; }
   public getClock(): number { return this.clock; }
   public getLevelIndex(): number { return this.levelIndex; }
-  public getWorld(): number { return LEVELS[this.levelIndex]?.world ?? 0; }
   public getPopups(): readonly Popup[] { return this.popups; }
   public isFrightened(): boolean { return this.frightLeft > 0; }
   public getFrightLeft(): number { return this.frightLeft; }
-  public getDeathProgress(): number { return Math.min(1, this.deathTimer / DEATH_SECONDS); }
+  /** Seconds of flashing at the end of a frightened spell (shorter spells flash for less). */
+  public getFlashWindow(): number { return Math.min(2, this.frightTotal * 0.6); }
+  public getDeathProgress(): number { return Math.max(0, Math.min(1, (this.deathTimer - DEATH_PAUSE) / (DEATH_SECONDS - DEATH_PAUSE))); }
   public getClearProgress(): number { return Math.min(1, this.clearTimer / CLEAR_SECONDS); }
+  public getFruitTime(): number { return this.fruitTimer; }
+  public getFruit(): { readonly name: FruitName; readonly points: number } { return fruitForLevel(this.levelIndex); }
+  public getFreeze(): number { return this.freeze; }
 
   /* ---------- lifecycle ---------- */
+
+  private buildMaze(index: number): Maze {
+    const maze = new Maze(LEVELS[index]!);
+    if (index === 255) maze.corruptRightHalf();
+    return maze;
+  }
 
   private spawnGhosts(): Ghost[] {
     return [new BlinkyGhost(), new PinkyGhost(), new InkyGhost(), new ClydeGhost()];
   }
 
-  /** Resets positions and timers for a fresh attempt; pellets stay as they are. */
-  private beginRound(): void {
+  private ghost(id: GhostId): Ghost {
+    return this.ghosts.find(g => g.id === id)!;
+  }
+
+  /** Puts everyone back on their start tiles for a fresh attempt; pellets stay as they are. */
+  private resetPositions(): void {
     this.pacman = new PacMan(PACMAN_START);
     this.ghosts = this.spawnGhosts();
     this.frightLeft = 0;
@@ -138,9 +166,7 @@ export class GameEngine {
     this.huntPhase = this.config.schedule[0]!.phase;
     this.huntTimer = this.config.schedule[0]!.seconds;
     for (const ghost of this.ghosts) ghost.huntPhase = this.huntPhase;
-    this.fruitVisible = 0;
-    this.fruitAvailable.clear();
-    this.eatenThisLife = 0;
+    this.fruitTimer = 0;
     this.idleTimer = 0;
     this.sinceRelease = RELEASE_GAP_SECONDS;
     this.freeze = 0;
@@ -153,14 +179,18 @@ export class GameEngine {
   private loadLevel(index: number): void {
     this.levelIndex = index;
     this.config = levelConfig(index);
-    this.maze = new Maze(LEVELS[index]!);
-    if (index === 255) this.maze.corruptRightHalf();
+    this.maze = this.buildMaze(index);
     this.dotsEaten = 0;
-    this.fruitVisible = 0;
-    this.fruitAvailable = new Set();
+    this.fruitSpawned = new Set();
+    this.counters = { pinky: 0, inky: 0, clyde: 0 };
+    this.globalActive = false;
+    this.globalCount = 0;
+    this.elroyActive = true;
+    this.ghostsEatenLevel = 0;
+    this.powersEatenLevel = 0;
     this.levelStartScore = this.score;
     this.levelStartLives = this.lives;
-    this.beginRound();
+    this.resetPositions();
     this.emitHud(true);
   }
 
@@ -168,11 +198,13 @@ export class GameEngine {
   public begin(): void {
     if (this.mode !== "ready") return;
     this.mode = "playing";
+    this.events.onSound?.("start");
     this.emitHud(true);
   }
 
   public pause(): void {
-    if (this.mode !== "playing") return;
+    if (this.mode !== "playing" && this.mode !== "ready") return;
+    if (this.mode === "ready") return;
     this.mode = "paused";
     this.emitHud(true);
   }
@@ -189,7 +221,7 @@ export class GameEngine {
     else if (this.mode === "ready") this.begin();
   }
 
-  /** Continue from the level-clear card. */
+  /** Continue from the kill-screen card (round 256 has no successor). */
   public nextLevel(): void {
     if (this.mode !== "levelclear" || this.levelIndex >= TOTAL_LEVELS - 1) return;
     this.loadLevel(this.levelIndex + 1);
@@ -253,26 +285,33 @@ export class GameEngine {
       return;
     }
 
-    if (this.fruitVisible > 0) this.fruitVisible = Math.max(0, this.fruitVisible - dt);
+    if (this.fruitTimer > 0) this.fruitTimer = Math.max(0, this.fruitTimer - dt);
 
     if (this.frightLeft > 0) {
       this.frightLeft = Math.max(0, this.frightLeft - dt);
-      if (this.frightLeft === 0) for (const ghost of this.ghosts) ghost.endFrightened();
+      if (this.frightLeft === 0) {
+        for (const ghost of this.ghosts) ghost.endFrightened();
+        this.chain = 0;
+      }
     } else {
       this.advanceHuntClock(dt);
     }
 
-    this.pacman.update(this.maze, dt, this.config.pacSpeed, this.clock, this.handlePellet);
-    this.releaseGhosts(dt);
+    const speed = this.frightLeft > 0 ? this.config.pacFrightSpeed : this.config.pacSpeed;
+    this.pacman.update(this.maze, dt, speed, this.handleTile);
+    if (this.mode !== "playing") return;
+    this.checkFruit();
+    this.updateReleases(dt);
 
-    const blinky = this.ghosts[0]!;
+    const blinky = this.ghost("blinky");
     const context = {
       pacman: this.pacman,
-      blinkyCell: blinky.cell,
+      blinkyTile: blinky.tile,
       maze: this.maze,
       rng: this.rng,
       config: this.config,
-      pelletsLeft: this.maze.remainingPellets
+      pelletsLeft: this.maze.remainingPellets,
+      elroyActive: this.elroyActive
     };
     for (const ghost of this.ghosts) ghost.update(context, dt);
 
@@ -291,52 +330,96 @@ export class GameEngine {
     for (const ghost of this.ghosts) ghost.setHuntPhase(step.phase);
   }
 
-  private releaseGhosts(dt: number): void {
-    this.idleTimer += dt;
-    this.sinceRelease += dt;
-    if (this.sinceRelease < RELEASE_GAP_SECONDS) return;
+  /* ---------- ghost house ---------- */
+
+  private releaseNext(): void {
     for (const id of RELEASE_ORDER) {
-      const ghost = this.ghosts.find(g => g.id === id);
-      if (!ghost || ghost.phase !== "house") continue;
-      const needed = this.config.release[id as "pinky" | "inky" | "clyde"];
-      if (this.eatenThisLife >= needed || this.idleTimer >= IDLE_RELEASE_SECONDS) {
-        ghost.release();
-        this.idleTimer = 0;
-        this.sinceRelease = 0;
-      }
+      const ghost = this.ghost(id);
+      if (ghost.phase !== "house") continue;
+      ghost.release();
+      this.idleTimer = 0;
+      this.sinceRelease = 0;
       return;
     }
   }
 
-  private handlePellet = (isPower: boolean): void => {
-    this.eatenThisLife += 1;
-    this.dotsEaten += 1;
-    this.idleTimer = 0;
-    this.addScore(PELLET_SCORE + this.levelIndex * PELLET_SCORE_PER_LEVEL);
-    if ((this.dotsEaten === 70 || this.dotsEaten === 170) && !this.fruitAvailable.has(this.dotsEaten)) {
-      this.fruitAvailable.add(this.dotsEaten);
-      this.fruitVisible = 9.5;
+  private waiting(): "pinky" | "inky" | "clyde" | null {
+    return RELEASE_ORDER.find(id => this.ghost(id).phase === "house") ?? null;
+  }
+
+  private updateReleases(dt: number): void {
+    this.idleTimer += dt;
+    this.sinceRelease += dt;
+    if (this.globalActive && this.ghost("clyde").phase !== "house") {
+      this.globalActive = false;
+      this.globalCount = 0;
+      this.elroyActive = true;
     }
-    const fruitPos = this.pacman.renderPosition();
-    if (this.fruitVisible > 0 && Math.hypot(fruitPos.x - 13.5, fruitPos.y - 23) < 0.5) {
-      this.addScore(fruitForLevel(this.levelIndex).points);
-      this.fruitVisible = 0;
+    const next = this.waiting();
+    if (!next || this.sinceRelease < RELEASE_GAP_SECONDS) return;
+    if (this.idleTimer >= this.config.houseTimeout) {
+      this.releaseNext();
+      return;
+    }
+    if (!this.globalActive && this.counters[next] >= this.config.release[next]) this.releaseNext();
+  }
+
+  private countDotForRelease(): void {
+    this.idleTimer = 0;
+    if (this.globalActive) {
+      this.globalCount += 1;
+      for (const id of RELEASE_ORDER) {
+        if (this.globalCount === GLOBAL_LIMITS[id] && this.ghost(id).phase === "house") {
+          this.ghost(id).release();
+          this.sinceRelease = 0;
+        }
+      }
+      return;
+    }
+    const next = this.waiting();
+    if (next) this.counters[next] += 1;
+  }
+
+  /* ---------- eating ---------- */
+
+  private handleTile = (x: number, y: number): void => {
+    if (!this.maze.consumePellet(x, y)) return;
+    const isPower = this.maze.isPowerPellet(x, y);
+    this.dotsEaten += 1;
+    this.countDotForRelease();
+    this.addScore(PELLET_SCORE);
+    this.pacman.addStall(isPower ? 3 / 60 : 1 / 60);
+    this.wakaToggle = !this.wakaToggle;
+    this.events.onSound?.(this.wakaToggle ? "waka1" : "waka2");
+    if ((this.dotsEaten === 70 || this.dotsEaten === 170) && !this.fruitSpawned.has(this.dotsEaten)) {
+      this.fruitSpawned.add(this.dotsEaten);
+      this.fruitTimer = FRUIT_SECONDS;
     }
     if (!isPower) return;
-    this.addScore(POWER_PELLET_SCORE);
+    this.addScore(POWER_PELLET_SCORE - PELLET_SCORE);
+    this.powersEatenLevel += 1;
+    this.events.onHaptic("power");
     if (this.config.frightSeconds <= 0) {
       for (const ghost of this.ghosts) ghost.requestReverse();
-      this.events.onHaptic("power");
       return;
     }
     this.frightLeft = this.config.frightSeconds;
+    this.frightTotal = this.config.frightSeconds;
     this.chain = 0;
     for (const ghost of this.ghosts) ghost.startFrightened();
-    this.events.onHaptic("power");
+    this.events.onSound?.("power");
   };
 
-  public getFruitTime(): number { return this.fruitVisible; }
-  public getFruit(): { readonly name: string; readonly points: number } { return fruitForLevel(this.levelIndex); }
+  private checkFruit(): void {
+    if (this.fruitTimer <= 0) return;
+    const p = this.pacman.renderPosition();
+    if (Math.hypot(p.x - FRUIT_POSITION.x, p.y - FRUIT_POSITION.y) > 0.75) return;
+    const fruit = this.getFruit();
+    this.addScore(fruit.points);
+    this.popups.push({ x: FRUIT_POSITION.x, y: FRUIT_POSITION.y, text: String(fruit.points), age: 0 });
+    this.fruitTimer = 0;
+    this.events.onSound?.("fruit");
+  }
 
   private addScore(points: number): void {
     this.score += points;
@@ -344,6 +427,7 @@ export class GameEngine {
     if (!this.extraLifeGiven && this.score >= EXTRA_LIFE_AT) {
       this.extraLifeGiven = true;
       this.lives += 1;
+      this.events.onSound?.("life");
     }
   }
 
@@ -352,22 +436,31 @@ export class GameEngine {
     for (const ghost of this.ghosts) {
       if (!ghost.isActive) continue;
       const g = ghost.renderPosition();
-      if (Math.hypot(g.x - p.x, g.y - p.y) >= COLLISION_RADIUS) continue;
+      const d = Math.hypot(g.x - p.x, g.y - p.y);
       if (ghost.isVulnerable) {
+        if (d >= EAT_RADIUS) continue;
         ghost.markEaten();
         const points = GHOST_CHAIN[Math.min(this.chain, GHOST_CHAIN.length - 1)]!;
         this.chain += 1;
+        this.ghostsEatenLevel += 1;
         this.addScore(points);
         this.popups.push({ x: g.x, y: g.y, text: String(points), age: 0 });
+        if (this.ghostsEatenLevel === 16 && this.powersEatenLevel === 4) {
+          this.addScore(ALL_GHOSTS_BONUS);
+          this.popups.push({ x: 13.5, y: 17, text: String(ALL_GHOSTS_BONUS), age: 0 });
+        }
         this.freeze = FREEZE_SECONDS;
         this.events.onHaptic("eat");
-      } else {
-        this.mode = "dying";
-        this.deathTimer = 0;
-        this.events.onHaptic("die");
-        this.emitHud(true);
+        this.events.onSound?.("ghost");
         return;
       }
+      if (d >= KILL_RADIUS) continue;
+      this.mode = "dying";
+      this.deathTimer = 0;
+      this.events.onHaptic("die");
+      this.events.onSound?.("die");
+      this.emitHud(true);
+      return;
     }
   }
 
@@ -378,9 +471,12 @@ export class GameEngine {
       this.mode = "over";
       this.events.onGameEnd(this.score, false);
     } else {
-      this.fruitVisible = 0;
-      this.fruitAvailable.clear();
-      this.beginRound();
+      // Arcade rule: after a death a global dot counter (7 / 17 / 32) governs the house.
+      this.globalActive = true;
+      this.globalCount = 0;
+      this.elroyActive = false;
+      this.fruitTimer = 0;
+      this.resetPositions();
     }
     this.emitHud(true);
   }
@@ -394,14 +490,15 @@ export class GameEngine {
       return;
     }
     this.completed.add(this.levelIndex);
-    this.addScore(LEVEL_CLEAR_BONUS);
     this.events.onLevelCleared(this.levelIndex, this.score);
     this.events.onHaptic("clear");
+    this.events.onSound?.("clear");
     this.emitHud(true);
   }
 
   private afterClear(): void {
-    this.mode = "levelclear";
+    if (this.levelIndex < TOTAL_LEVELS - 1) this.loadLevel(this.levelIndex + 1);
+    else this.mode = "levelclear";
     this.emitHud(true);
   }
 
@@ -409,7 +506,7 @@ export class GameEngine {
 
   private emitHud(force: boolean): void {
     const level = LEVELS[this.levelIndex];
-    const frightened = this.frightLeft > 0 ? Math.round((this.frightLeft / this.config.frightSeconds) * 25) / 25 : 0;
+    const frightened = this.frightLeft > 0 ? Math.round((this.frightLeft / this.frightTotal) * 25) / 25 : 0;
     const ghosts = this.ghosts.map(g => ({ id: g.id, mode: g.displayMode }));
     const key = [
       this.score, this.best, this.levelIndex, this.lives, this.mode, this.maze.remainingPellets,
@@ -431,7 +528,8 @@ export class GameEngine {
       frightened,
       ghosts,
       phase: this.huntPhase,
-      completedLevels: Array.from(this.completed)
+      completedLevels: Array.from(this.completed),
+      fruit: fruitForLevel(this.levelIndex).name
     });
   }
 }

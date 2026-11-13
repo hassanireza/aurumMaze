@@ -1,4 +1,4 @@
-import type { ControlScheme, HapticKind } from "./types";
+import type { ControlScheme, HapticKind, ViewMode } from "./types";
 import { TOTAL_LEVELS } from "./levels";
 
 export interface ProgressData {
@@ -8,10 +8,12 @@ export interface ProgressData {
   readonly completed: readonly number[];
   readonly controls: ControlScheme;
   readonly haptics: boolean;
+  readonly sound: boolean;
+  readonly view: ViewMode;
 }
 
 const STORAGE_KEY = "aurum-maze:v2";
-const DEFAULTS: ProgressData = { unlocked: 0, best: 0, completed: [], controls: "swipe", haptics: true };
+const DEFAULTS: ProgressData = { unlocked: 0, best: 0, completed: [], controls: "swipe", haptics: true, sound: true, view: "close" };
 
 type Listener = () => void;
 
@@ -33,7 +35,9 @@ class ProgressStore {
         best: Math.max(0, Number(parsed.best) || 0),
         completed,
         controls: parsed.controls === "dpad" ? "dpad" : "swipe",
-        haptics: parsed.haptics !== false
+        haptics: parsed.haptics !== false,
+        sound: parsed.sound !== false,
+        view: parsed.view === "full" || parsed.view === "closer" ? parsed.view : "close"
       };
     } catch {
       return DEFAULTS;
@@ -81,6 +85,14 @@ class ProgressStore {
 
   public setHaptics(haptics: boolean): void {
     this.commit({ ...this.data, haptics });
+  }
+
+  public setView(view: ViewMode): void {
+    this.commit({ ...this.data, view });
+  }
+
+  public setSound(sound: boolean): void {
+    this.commit({ ...this.data, sound });
   }
 
   public reset(): void {
