@@ -31,7 +31,7 @@ html, body {
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
 }
-body { position: fixed; inset: 0; overflow: hidden; }
+body { overflow: hidden; }
 #root { height: 100%; }
 
 a { color: inherit; text-decoration: none; }
@@ -45,8 +45,6 @@ ul { list-style: none; }
 .icon-fill { fill: currentColor; }
 
 /* ---------- shell ---------- */
-/* Solid cap behind the iOS status bar (installed web app, translucent bar) so nothing shows or blurs through it. */
-.app::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: var(--safe-t); background: #050505; z-index: 60; pointer-events: none; }
 .app {
   position: relative;
   display: flex;
@@ -58,7 +56,7 @@ ul { list-style: none; }
   overflow: hidden;
 }
 .backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 0;
   background:
