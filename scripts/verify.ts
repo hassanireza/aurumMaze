@@ -175,4 +175,28 @@ ok("pac-man: steering, instant reverse, tunnel wrap, corner window");
   if (e.getMaze().glyph(20, 10) !== " ") fail("level 256: right half was not corrupted");
   ok("round 256 kill-screen setup");
 }
+
+
+/* ---------- swipe recognition ---------- */
+{
+  const { SwipeRecognizer } = await import("../src/game/SwipeRecognizer");
+  const run = (points: readonly [number, number, number][]): string[] => {
+    const r = new SwipeRecognizer();
+    const out: string[] = [];
+    r.start(points[0]![0], points[0]![1], points[0]![2]);
+    for (const [x, y, t] of points.slice(1)) { const d = r.move(x, y, t); if (d) out.push(d); }
+    return out;
+  };
+  const eq = (a: string[], b: string[], name: string): void => { if (a.join() !== b.join()) fail(`swipe: ${name}: got [${a}] expected [${b}]`); };
+  eq(run([[100, 100, 0], [112, 100, 200]]), ["right"], "slow swipe right");
+  eq(run([[100, 100, 0], [107, 100, 40]]), ["right"], "quick flick");
+  eq(run([[100, 100, 0], [111, 110, 200]]), [], "diagonal is ambiguous");
+  eq(run([[100, 100, 0], [112, 100, 100], [100, 101, 300]]), ["right"], "12px wobble back must not reverse");
+  eq(run([[100, 100, 0], [112, 100, 100], [200, 100, 300], [185, 100, 400]]), ["right"], "wobble after a long stroke must not reverse");
+  eq(run([[100, 100, 0], [112, 100, 100], [200, 100, 300], [165, 100, 500]]), ["right", "left"], "deliberate reverse from furthest point");
+  eq(run([[100, 100, 0], [112, 100, 100], [114, 114, 300]]), ["right", "down"], "turn 90 degrees");
+  eq(run([[100, 100, 0], [112, 100, 100], [130, 104, 150], [150, 98, 200]]), ["right"], "steady stroke fires once");
+  eq(run([[100, 100, 0], [112, 100, 100], [114, 114, 250], [112, 132, 500], [108, 131, 520]]), ["right", "down"], "no reverse from end jitter");
+}
+ok("swipe recognizer: slop, flick, no jitter reversals");
 console.log("verify passed");
