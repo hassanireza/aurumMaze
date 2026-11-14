@@ -34,7 +34,7 @@ export type ControlScheme = "swipe" | "dpad";
 /** Full: whole maze. Close and Closer: zoomed camera that follows Pac-Man. */
 export type ViewMode = "full" | "close" | "closer";
 
-export type HapticKind = "power" | "eat" | "die" | "clear";
+export type HapticKind = "tick" | "power" | "eat" | "die" | "clear";
 
 export type SoundName = "waka1" | "waka2" | "power" | "ghost" | "fruit" | "die" | "clear" | "start" | "life";
 

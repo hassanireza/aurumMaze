@@ -189,7 +189,7 @@ export class Renderer {
     ctx.drawImage(layer, this.camX * sk, this.camY * sk, (this.canvas.width / k) * sk, (this.canvas.height / k) * sk, 0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(k, 0, 0, k, -this.camX * k, -this.camY * k);
 
-    if (mode !== "clearing") this.drawPellets(maze, clock);
+    if (mode !== "clearing") this.drawPellets(maze, clock, killScreen);
     if (killScreen) this.drawKillScreen(clock);
     else if (engine.getFruitTime() > 0 && mode !== "clearing") {
       const left = engine.getFruitTime();
@@ -225,8 +225,16 @@ export class Renderer {
     if (!g) return canvas;
     g.setTransform(k, 0, 0, k, 0, 0);
     g.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    g.save();
+    if (killScreen) {
+      // Round 256: only the left half of the picture survives; the right half is overdrawn with garbage.
+      g.beginPath();
+      g.rect(0, 0, M + 14 * CELL, CANVAS_HEIGHT);
+      g.clip();
+    }
     this.paintWalls(g, maze, flash);
     this.paintGate(g, maze);
+    g.restore();
     this.cache = { key, canvas };
     return canvas;
   }
@@ -331,11 +339,12 @@ export class Renderer {
     return list;
   }
 
-  private drawPellets(maze: Maze, clock: number): void {
+  private drawPellets(maze: Maze, clock: number, killScreen = false): void {
     const ctx = this.ctx;
     const pulse = 0.5 + 0.5 * Math.sin(clock * 7);
     for (const s of this.spots(maze)) {
       if (!maze.pellets.has(s.key)) continue;
+      if (killScreen && s.x >= 14) continue; // still there in the game logic, just not drawn
       const px = cx(s.x);
       const py = cy(s.y);
       if (s.power) {
