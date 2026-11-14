@@ -6,7 +6,7 @@ import { PinkyGhost } from "./ghosts/PinkyGhost";
 import { InkyGhost } from "./ghosts/InkyGhost";
 import { ClydeGhost } from "./ghosts/ClydeGhost";
 import { LEVELS, TOTAL_LEVELS } from "./levels";
-import { fruitForLevel, levelConfig, type LevelConfig } from "./difficulty";
+import { ARCADE_SPEED, BASE_SPEED, fruitForLevel, levelConfig, type LevelConfig } from "./difficulty";
 import { Rng } from "./Rng";
 import {
   ALL_GHOSTS_BONUS,
@@ -41,7 +41,6 @@ const DEATH_SECONDS = 1.7;
 const CLEAR_SECONDS = 2.0;
 const FREEZE_SECONDS = 0.7;
 const RELEASE_GAP_SECONDS = 0.45;
-const FRUIT_SECONDS = 9.5;
 const RELEASE_ORDER: readonly ("pinky" | "inky" | "clyde")[] = ["pinky", "inky", "clyde"];
 const GLOBAL_LIMITS = { pinky: 7, inky: 17, clyde: 32 } as const;
 const MAX_STEPS_PER_FRAME = 12;
@@ -59,6 +58,8 @@ export interface GameEngineOptions {
   readonly best: number;
   readonly completed: readonly number[];
   readonly seed?: number;
+  /** "arcade" runs at the cabinet's 100% speed, "comfort" at about 90% of it. */
+  readonly pace?: "comfort" | "arcade";
 }
 
 /** Central coordinator: owns maze/entities and drives the fixed-step simulation. */
@@ -67,7 +68,9 @@ export class GameEngine {
   private pacman: PacMan;
   private ghosts: Ghost[];
   private config: LevelConfig;
-  private readonly rng: Rng;
+  private rng: Rng;
+  private readonly seed: number;
+  private baseSpeed: number;
 
   private mode: GameMode = "ready";
   private score = 0;
@@ -111,9 +114,11 @@ export class GameEngine {
   ) {
     this.levelIndex = Math.max(0, Math.min(TOTAL_LEVELS - 1, options.startLevel));
     this.best = options.best;
-    this.rng = new Rng(options.seed ?? (Date.now() & 0xffffff));
+    this.seed = options.seed ?? 0x5eed;
+    this.rng = new Rng(this.seed);
+    this.baseSpeed = options.pace === "arcade" ? ARCADE_SPEED : BASE_SPEED;
     this.completed = new Set(options.completed);
-    this.config = levelConfig(this.levelIndex);
+    this.config = levelConfig(this.levelIndex, this.baseSpeed);
     this.maze = this.buildMaze(this.levelIndex);
     this.pacman = new PacMan(PACMAN_START);
     this.ghosts = this.spawnGhosts();
@@ -144,7 +149,6 @@ export class GameEngine {
 
   private buildMaze(index: number): Maze {
     const maze = new Maze(LEVELS[index]!);
-    if (index === 255) maze.corruptRightHalf();
     return maze;
   }
 
@@ -158,6 +162,8 @@ export class GameEngine {
 
   /** Puts everyone back on their start tiles for a fresh attempt; pellets stay as they are. */
   private resetPositions(): void {
+    // Arcade: the pseudo-random generator restarts from the same seed on every level and every life.
+    this.rng = new Rng(this.seed);
     this.pacman = new PacMan(PACMAN_START);
     this.ghosts = this.spawnGhosts();
     this.frightLeft = 0;
@@ -178,7 +184,7 @@ export class GameEngine {
 
   private loadLevel(index: number): void {
     this.levelIndex = index;
-    this.config = levelConfig(index);
+    this.config = levelConfig(index, this.baseSpeed);
     this.maze = this.buildMaze(index);
     this.dotsEaten = 0;
     this.fruitSpawned = new Set();
@@ -192,6 +198,12 @@ export class GameEngine {
     this.levelStartLives = this.lives;
     this.resetPositions();
     this.emitHud(true);
+  }
+
+  /** Switches between comfort pace and the cabinet's exact pace without restarting. */
+  public setPace(pace: "comfort" | "arcade"): void {
+    this.baseSpeed = pace === "arcade" ? ARCADE_SPEED : BASE_SPEED;
+    this.config = levelConfig(this.levelIndex, this.baseSpeed);
   }
 
   /** ready -> playing. Called on the first swipe or tap. */
@@ -393,7 +405,7 @@ export class GameEngine {
     this.events.onSound?.(this.wakaToggle ? "waka1" : "waka2");
     if ((this.dotsEaten === 70 || this.dotsEaten === 170) && !this.fruitSpawned.has(this.dotsEaten)) {
       this.fruitSpawned.add(this.dotsEaten);
-      this.fruitTimer = FRUIT_SECONDS;
+      this.fruitTimer = 9 + Math.random();
     }
     if (!isPower) return;
     this.addScore(POWER_PELLET_SCORE - PELLET_SCORE);

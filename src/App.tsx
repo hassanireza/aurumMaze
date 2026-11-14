@@ -12,7 +12,7 @@ export function App(): JSX.Element {
   const route = useRoute();
   const progress = useSyncExternalStore(progressStore.subscribe, progressStore.getSnapshot);
   const playing = route.name === "play";
-  const playLevel = route.name === "play" ? Math.min(route.level, progress.unlocked) : 0;
+  const playLevel = route.name === "play" ? (route.level === 255 ? 255 : Math.min(route.level, progress.unlocked)) : 0;
 
   return (
     <div className="app" data-view={route.name}>

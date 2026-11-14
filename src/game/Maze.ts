@@ -37,16 +37,6 @@ export class Maze {
     return `${x},${y}`;
   }
 
-  /** Visual corruption used by the level-256 hardware overflow; paths stay open there. */
-  public corruptRightHalf(): void {
-    for (let y = 0; y < this.rowCount; y += 1) {
-      for (let x = 14; x < this.columnCount; x += 1) {
-        const g = this.grid[y]![x]!;
-        if (g === "#" || g === "h" || g === "-") this.grid[y]![x] = " ";
-      }
-    }
-  }
-
   public glyph(x: number, y: number): string {
     return this.grid[y]?.[x] ?? "#";
   }

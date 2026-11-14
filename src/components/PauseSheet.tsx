@@ -8,6 +8,9 @@ interface PauseSheetProps {
   readonly haptics: boolean;
   readonly sound: boolean;
   readonly view: ViewMode;
+  readonly ready: boolean;
+  readonly pace: "comfort" | "arcade";
+  readonly onPace: (pace: "comfort" | "arcade") => void;
   readonly onView: (view: ViewMode) => void;
   readonly onResume: () => void;
   readonly onRestart: () => void;
@@ -24,10 +27,10 @@ function Switch({ on, label, onToggle }: { readonly on: boolean; readonly label:
   );
 }
 
-export function PauseSheet({ controls, haptics, sound, view, onView, onResume, onRestart, onControls, onHaptics, onSound }: PauseSheetProps): JSX.Element {
+export function PauseSheet({ controls, haptics, sound, view, ready, pace, onPace, onView, onResume, onRestart, onControls, onHaptics, onSound }: PauseSheetProps): JSX.Element {
   return (
-    <Sheet label="Paused" onClose={onResume}>
-      <h2 className="sheet-title">Paused</h2>
+    <Sheet label={ready ? "Settings" : "Paused"} onClose={onResume}>
+      <h2 className="sheet-title">{ready ? "Settings" : "Paused"}</h2>
 
       <div className="sheet-row">
         <span className="sheet-label">Controls</span>
@@ -51,6 +54,13 @@ export function PauseSheet({ controls, haptics, sound, view, onView, onResume, o
         </div>
       </div>
       <div className="sheet-row">
+        <span className="sheet-label"><Icon name="clock" size={18} /> Speed</span>
+        <div className="segmented" role="radiogroup" aria-label="Speed">
+          <button type="button" role="radio" aria-checked={pace === "comfort"} className={pace === "comfort" ? "on" : ""} onClick={() => onPace("comfort")}>Comfort</button>
+          <button type="button" role="radio" aria-checked={pace === "arcade"} className={pace === "arcade" ? "on" : ""} onClick={() => onPace("arcade")}>Arcade</button>
+        </div>
+      </div>
+      <div className="sheet-row">
         <span className="sheet-label"><Icon name={sound ? "sound" : "mute"} size={18} /> Sound</span>
         <Switch on={sound} label="Sound" onToggle={() => onSound(!sound)} />
       </div>
@@ -59,14 +69,14 @@ export function PauseSheet({ controls, haptics, sound, view, onView, onResume, o
         <Switch on={haptics} label="Haptics" onToggle={() => onHaptics(!haptics)} />
       </div>
 
-      <nav className="sheet-links" aria-label="Leave game">
-        <button type="button" onClick={onRestart}><Icon name="restart" size={18} /> Restart</button>
+      <nav className={ready ? "sheet-links two" : "sheet-links"} aria-label="Leave game">
+        {ready ? null : <button type="button" onClick={onRestart}><Icon name="restart" size={18} /> Restart</button>}
         <a href="#/levels"><Icon name="levels" size={18} /> Rounds</a>
         <a href="#/"><Icon name="home" size={18} /> Home</a>
       </nav>
 
       <button type="button" className="btn btn-primary btn-block btn-large" onClick={onResume} autoFocus>
-        <Icon name="play" size={20} /> Resume
+        <Icon name={ready ? "check" : "play"} size={20} /> {ready ? "Done" : "Resume"}
       </button>
     </Sheet>
   );

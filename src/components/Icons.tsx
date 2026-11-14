@@ -3,7 +3,7 @@ import type { JSX } from "react";
 export type IconName =
   | "home" | "play" | "levels" | "ghost" | "pause" | "restart" | "lock" | "check"
   | "arrow-right" | "arrow-up" | "arrow-down" | "arrow-left" | "close" | "swipe" | "heart"
-  | "sound" | "mute" | "help" | "chevron-left" | "chevron-right" | "vibrate" | "trophy" | "zoom";
+  | "sound" | "mute" | "help" | "chevron-left" | "chevron-right" | "vibrate" | "trophy" | "zoom" | "sliders" | "clock";
 
 interface IconProps {
   readonly name: IconName;
@@ -41,6 +41,8 @@ const PATHS: Record<IconName, JSX.Element> = {
   "chevron-left": <path d="m14.5 6-6 6 6 6" />,
   "chevron-right": <path d="m9.5 6 6 6-6 6" />,
   vibrate: <path d="M8.5 4.5h7v15h-7zM4.5 8v8M19.5 8v8" />,
+  clock: <path d="M12 4.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15ZM12 8v4.2l2.8 1.7" />,
+  sliders: <path d="M4 7h9M17 7h3M4 17h3M11 17h9M13 4.5v5M7 14.5v5" />,
   zoom: <path d="M10.5 4.5a6 6 0 1 0 0 12 6 6 0 0 0 0-12ZM15 15l5 5M8 10.5h5M10.5 8v5" />,
   trophy: <path d="M8 4.5h8v5a4 4 0 0 1-8 0zM8 6.5H5v1.5a3 3 0 0 0 3 3M16 6.5h3v1.5a3 3 0 0 1-3 3M12 13.5v3.5M8.5 19.5h7" />
 };

@@ -71,7 +71,7 @@
 | **Play** | The game | Maze uses the full screen width. Lives, ghost moods and fruit sit directly below it |
 | **Rounds** | Pick any unlocked round | Twenty rounds per page in a four by five grid, each with its fruit |
 | **Ghosts** | Learn how each ghost hunts | One ghost per screen. Swipe sideways, tap a face to jump |
-| **Pause** | View, controls, sound, haptics, exit | A bottom sheet in the thumb zone |
+| **Settings and pause** | View, controls, speed, sound, haptics. Opens before the game starts too, with a gear button | A bottom sheet in the thumb zone |
 
 ---
 
@@ -139,7 +139,7 @@
 <img src="assets/icons/sound.svg" width="20" height="20" align="absmiddle" alt=""/> **Sound and feel**
 - Synthesised effects, no audio files
 - Unlocked on the first swipe for iOS
-- Haptics on supported devices
+- Haptics on Android, and Taptic ticks on iPhone with iOS 17.4 or later
 - Auto pause when the app is hidden
 
 </td>
@@ -165,7 +165,7 @@
 | Tunnel | Row 14, wraps left to right, slows ghosts |
 | Fruit | Below the house, 9.5 seconds, after 70 and 170 dots |
 | Pac-Man start | Centre line of row 23 |
-| Round 256 | The right half of the board turns to corrupted glyphs, as in the arcade |
+| Round 256 | Unlocked from the start as a preview. The right half of the picture turns to corrupted glyphs while the real maze keeps working underneath, as in the arcade |
 
 The layout lives in `src/game/arcadeMaze.ts` as plain text rows. Walls are traced into outlines at runtime and drawn as rounded gold lines, so the board looks light even though the collision grid is the original tile map.
 
@@ -187,7 +187,7 @@ The layout lives in `src/game/arcadeMaze.ts` as plain text rows. Walls are trace
 | **Inky** | The Flanker | Vector from Blinky to 2 tiles ahead of Pac-Man, doubled | Bottom right | After 30 dots on round 1 |
 | **Clyde** | The Shy One | Pac-Man, or his corner inside 8 tiles | Bottom left | After 60 dots on round 1 |
 
-**Shared rules.** Ghosts decide only at tile centres, never reverse by choice, pick the exit whose next tile is closest to the target, and break ties in the order up, left, down, right. Frightened ghosts wander at random. Eaten ghosts return as eyes and leave again at once.
+**Shared rules.** Ghosts decide only at tile centres, never reverse by choice, pick the exit whose next tile is closest to the target, and break ties in the order up, left, down, right. A ghost chooses its turn one tile early, using the target it had then. A forced reversal is obeyed only when the ghost reaches its next tile. Frightened ghosts wander with a seeded pseudo-random choice that restarts on every level and every life, so identical play repeats identically. Eaten ghosts return as eyes and leave again at once.
 
 **House release.** Each ghost has a personal dot counter. After a death a global counter of 7, 17 and 32 dots takes over. If you stop eating, an idle timer of 4 seconds (3 from round 5) pushes the next ghost out.
 
@@ -233,7 +233,7 @@ All values come from the arcade tables in `src/game/difficulty.ts`.
 | 5 to 20 | 100% | 95% | 50% | 60% | 5, 20, 5, 20, 5, then a long chase |
 | 21 and up | 90% | 95% | 50% | 60% | Same as 5 to 20, no frightened time |
 
-`BASE_SPEED` is 8.5 tiles per second for a 100% step. The cabinet runs near 9.5, so Aurum Maze plays at about 90% of arcade pace to give a thumb the same reaction margin a joystick has. It is the single dial for overall speed.
+The cabinet runs a 100% step at 9.47 tiles per second. **Comfort** speed (the default) plays at 8.5, about 90% of that, so a thumb has the reaction margin a joystick has. **Arcade** speed uses the exact cabinet value. Switch in the settings sheet at any time. Every ratio in the table is identical in both.
 
 ---
 
@@ -316,7 +316,9 @@ Open the address Vite prints. The base path is `/aurumMaze/`, so locally the gam
 |---|---|
 | Swipe anywhere | Steer, chain swipes without lifting |
 | Arrow keys or WASD | Steer on a keyboard |
-| Space, P or Esc | Pause and resume |
+| Space | Start a waiting game |
+| P or Esc | Open or close settings and pause |
+| Gear or pause button | Settings before the game starts, pause during play |
 | Zoom button | Cycle Full, Close and Closer views |
 | Pause sheet | Pick the view, switch to D-pad, toggle sound and haptics |
 
@@ -356,7 +358,27 @@ Progress, best score and options are stored in `localStorage` under `aurum-maze:
 <a id="accuracy"></a>
 ## <img src="assets/icons/target.svg" width="24" height="24" align="absmiddle" alt=""/> Accuracy
 
-The maze and rules follow the 1980 Midway arcade game. This is a browser reimplementation, not a frame accurate emulator. Sub-pixel movement, cornering, sound, the arcade's pseudo-random frightened turns and the exact corrupted screen differ from the hardware. Turns are deliberately more forgiving than a joystick, and overall pace is set to about 90% of the cabinet.
+The maze and rules follow the 1980 Midway arcade game as documented in the Pac-Man Dossier. Checked against a written research report of the arcade internals, this is how Aurum Maze compares.
+
+| Arcade rule | In Aurum Maze |
+|---|---|
+| Four target functions, one shared local path chooser | Same. Tie order up, left, down, right |
+| One tile of look-ahead | Same. Turns are chosen a tile early |
+| Reversal on every mode change, obeyed at the next tile | Same |
+| Pinky and Inky upward offset bug | Same |
+| Clyde switches at 8 tiles | Same |
+| Scatter and chase tables, timer pauses while frightened | Same, resets per life and level |
+| Frightened time per round, none from round 19 except round 18 | Same table. Pellets only reverse ghosts when it is zero |
+| Speed tables, tunnel slowdown, frightened speeds | Same ratios |
+| Dot pause 1 frame, energizer pause 3 frames | Same |
+| Cruise Elroy thresholds and speeds, suspended after a death | Same |
+| House release: personal counters, global counter, 4 s and 3 s timer | Same |
+| Fruit at 70 and 170 dots, 9 to 10 seconds, per round bonus table | Same |
+| 240 dots, 4 energizers, 2,600 points, ghost chain, 12,000 bonus, extra life at 10,000 | Same |
+| Seeded pseudo-random frightened turns restart each level and life | Same |
+| Round 256 split screen, gameplay logic intact | Same, as a visual corruption |
+
+**Known differences.** Movement is continuous in time rather than locked to 60.61 Hz frames, and the cornering is a smoothed snap rather than a pixel diagonal. Collisions use a small distance instead of strict same tile, which avoids the arcade pass through bug and is slightly kinder to the player, while eating a frightened ghost is more generous still. Default pace is about 90% of the cabinet (switchable to 100%), turns are more forgiving than a joystick, and the frightened flash window is simplified. The arcade hard setting jumper is not implemented.
 
 <a id="credits"></a>
 ## <img src="assets/icons/book.svg" width="24" height="24" align="absmiddle" alt=""/> Credits

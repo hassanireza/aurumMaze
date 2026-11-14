@@ -1,5 +1,5 @@
 import { Entity } from "./Entity";
-import { ALL_DIRECTIONS, DIRECTIONS, DOOR_Y, GATE_X, HOUSE_Y, NO_UP_TILES, oppositeOf } from "./constants";
+import { ALL_DIRECTIONS, DIRECTIONS, DOOR_Y, GATE_X, GRID_WIDTH, HOUSE_Y, NO_UP_TILES, oppositeOf } from "./constants";
 import type { LevelConfig } from "./difficulty";
 import type { Maze } from "./Maze";
 import type { PacMan } from "./PacMan";
@@ -43,6 +43,10 @@ export abstract class Ghost extends Entity {
   public rage = 0;
   public bobClock = 0;
   private readonly homeX: number;
+  /** Turn chosen one tile early (arcade look-ahead), executed on reaching the next tile centre. */
+  private pending: DirectionVector | null = null;
+  /** A forced reversal is obeyed only when the ghost reaches its next tile, as in the arcade. */
+  private reverseQueued = false;
 
   protected constructor(spawn: GridPoint, direction: DirectionVector, phase: GhostPhase) {
     super(spawn, direction);
@@ -110,21 +114,23 @@ export abstract class Ghost extends Entity {
     return this.getChaseTarget(context);
   }
 
-  private blockedUp(): boolean {
-    return NO_UP_TILES.some(t => t.x === this.tileX && t.y === this.tileY);
+  private blockedUp(x: number, y: number): boolean {
+    return NO_UP_TILES.some(t => t.x === x && t.y === y);
   }
 
-  private chooseDirection(context: GhostContext): DirectionVector {
+  /**
+   * Picks the exit to take from tile (x, y) when arriving with `heading`: the legal exit (never a
+   * reversal) whose next tile is closest to the target; ties go up, left, down, right.
+   */
+  private choose(context: GhostContext, x: number, y: number, heading: DirectionVector): DirectionVector | null {
     const { maze } = context;
-    const x = this.tileX;
-    const y = this.tileY;
-    const back = oppositeOf(this.direction);
+    const back = oppositeOf(heading);
     const eyes = this.phase === "eaten";
-    const restricted = !this.frightened && !eyes && this.blockedUp();
+    const restricted = !this.frightened && !eyes && this.blockedUp(x, y);
     const options = ALL_DIRECTIONS.filter(
       d => d !== back && maze.canStep(x, y, d) && !(restricted && d === DIRECTIONS.up)
     );
-    if (options.length === 0) return maze.canStep(x, y, back) ? back : DIRECTIONS.none;
+    if (options.length === 0) return maze.canStep(x, y, back) ? back : null;
     if (options.length === 1) return options[0]!;
     if (this.frightened && !eyes) return context.rng.pick(options);
 
@@ -139,6 +145,28 @@ export abstract class Ghost extends Entity {
       }
     }
     return best;
+  }
+
+  /** Reached a tile centre: obey a queued reversal or the turn chosen a tile ago, then look one tile ahead. */
+  private arrive(context: GhostContext): void {
+    const { maze } = context;
+    const x = this.tileX;
+    const y = this.tileY;
+    if (this.reverseQueued) {
+      this.reverseQueued = false;
+      const back = oppositeOf(this.direction);
+      this.direction = maze.canStep(x, y, back) ? back : this.direction;
+    } else if (this.pending && maze.canStep(x, y, this.pending)) {
+      this.direction = this.pending;
+    } else {
+      this.direction = this.choose(context, x, y, this.direction) ?? DIRECTIONS.none;
+    }
+    this.pending = null;
+    if (this.direction === DIRECTIONS.none) return;
+    // One tile of look-ahead: decide now what to do at the next tile, with today's target.
+    const ax = (x + this.direction.x + GRID_WIDTH) % GRID_WIDTH;
+    const ay = y + this.direction.y;
+    if (maze.canStand({ x: ax, y: ay })) this.pending = this.choose(context, ax, ay, this.direction);
   }
 
   /** Scripted house movement: returns true once the point is reached. */
@@ -182,6 +210,8 @@ export abstract class Ghost extends Entity {
         if (this.glide(GATE_X, DOOR_Y, d)) {
           this.phase = "roam";
           this.direction = DIRECTIONS.left;
+          this.pending = null;
+          this.reverseQueued = false;
         }
         return;
       }
@@ -205,7 +235,7 @@ export abstract class Ghost extends Entity {
               return;
             }
           }
-          this.direction = this.chooseDirection(context);
+          this.arrive(context);
         };
         this.travel(maze, speed * dt, (x, y, d) => maze.canStep(x, y, d), onCenter);
       }
@@ -224,7 +254,7 @@ export abstract class Ghost extends Entity {
   }
 
   public requestReverse(): void {
-    if (this.phase === "roam") this.direction = oppositeOf(this.direction);
+    if (this.phase === "roam") this.reverseQueued = true;
   }
 
   public endFrightened(): void {
@@ -240,5 +270,7 @@ export abstract class Ghost extends Entity {
   public markEaten(): void {
     this.phase = "eaten";
     this.frightened = false;
+    this.pending = null;
+    this.reverseQueued = false;
   }
 }

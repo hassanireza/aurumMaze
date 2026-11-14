@@ -31,6 +31,8 @@ export interface LevelConfig {
  * same reaction margin a joystick does. Every ratio below is the arcade's.
  */
 export const BASE_SPEED = 8.5;
+/** Faithful arcade pace: 100% = 75.7576 px/s on an 8 px tile = 9.47 tiles per second. */
+export const ARCADE_SPEED = 75.7576 / 8;
 
 const step = (phase: HuntPhase, seconds: number): HuntStep => ({ phase, seconds });
 const SCHEDULES: readonly (readonly HuntStep[])[] = [
@@ -46,10 +48,10 @@ const ELROY = [[20, 10], [30, 15], [40, 20], [40, 20], [40, 20], [50, 25], [50, 
 const HOUSE_DOTS = [[0, 30, 60], [0, 0, 50], [0, 0, 0]] as const;
 
 /** Core 1980 Midway progression table; level 21+ uses the final entry. */
-export function levelConfig(levelIndex: number): LevelConfig {
+export function levelConfig(levelIndex: number, baseSpeed: number = BASE_SPEED): LevelConfig {
   const level = levelIndex + 1;
   const band = level === 1 ? 0 : level <= 4 ? 1 : level <= 20 ? 2 : 3;
-  const pct = (list: readonly number[]): number => (list[band]! / 100) * BASE_SPEED;
+  const pct = (list: readonly number[]): number => (list[band]! / 100) * baseSpeed;
   const table = Math.min(levelIndex, 20);
   const [elroy1, elroy2] = ELROY[table]!;
   const dots = HOUSE_DOTS[Math.min(2, level - 1)]!;
@@ -59,8 +61,8 @@ export function levelConfig(levelIndex: number): LevelConfig {
     ghostSpeed: pct([75, 85, 95, 95]),
     tunnelSpeed: pct([40, 45, 50, 50]),
     frightSpeed: pct([50, 55, 60, 60]),
-    eyesSpeed: BASE_SPEED * 1.6,
-    houseSpeed: BASE_SPEED * 0.4,
+    eyesSpeed: baseSpeed * 1.6,
+    houseSpeed: baseSpeed * 0.4,
     elroy1Speed: pct([80, 90, 100, 100]),
     elroy2Speed: pct([85, 95, 105, 105]),
     frightSeconds: FRIGHT_SECONDS[table] ?? 0,

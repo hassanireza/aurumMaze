@@ -44,7 +44,10 @@ export class InputManager {
       if (event.key === " " || event.key === "Escape" || event.key === "p" || event.key === "P") {
         if (event.key === " " && target && target.tagName === "BUTTON") return;
         event.preventDefault();
-        if (!event.repeat) this.onToggle();
+        if (event.repeat) return;
+        // Space starts a waiting game; Esc and P open or close the menu.
+        if (event.key === " ") this.onTap();
+        else this.onToggle();
       }
     };
     window.addEventListener("keydown", handler);

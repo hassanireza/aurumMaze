@@ -168,12 +168,41 @@ ok("pac-man: steering, instant reverse, tunnel wrap, corner window");
   ok("arcade no-up intersections registered");
 }
 
+/* ---------- arcade ghost timing ---------- */
+{
+  const config = levelConfig(0);
+  const mk = (): { g: BlinkyGhost; ctx: Parameters<BlinkyGhost["update"]>[0] } => {
+    const e = new GameEngine(quiet, { startLevel: 0, best: 0, completed: [], seed: 4 });
+    const g = new BlinkyGhost();
+    g.resetTo({ x: 6, y: 5 }, DIRECTIONS.right);
+    return { g, ctx: { pacman: e.getPacman(), blinkyTile: g.tile, maze, rng: new Rng(1), config, pelletsLeft: 100, elroyActive: true } };
+  };
+  // A forced reversal is obeyed on reaching the next tile, never in the middle of a tile.
+  const a = mk();
+  a.g.update(a.ctx, 0.03);
+  const before = a.g.px;
+  a.g.requestReverse();
+  a.g.update(a.ctx, 0.004);
+  if (a.g.direction !== DIRECTIONS.right || a.g.px <= before) fail("reversal must wait for the next tile centre");
+  for (let i = 0; i < 400 && a.g.direction === DIRECTIONS.right; i += 1) a.g.update(a.ctx, 1 / 120);
+  if (a.g.direction !== DIRECTIONS.left) fail("ghost never obeyed the queued reversal");
+  // Same inputs, same seed: identical ghost paths (the arcade's pattern play).
+  const run = (): string => {
+    const g = new GameEngine(quiet, { startLevel: 0, best: 0, completed: [], seed: 7 });
+    g.queueDirection("left");
+    for (let i = 0; i < 60 * 40; i += 1) { if (i % 53 === 0) g.queueDirection(i % 106 === 0 ? "up" : "down"); g.update(1 / 60); }
+    return g.getGhosts().map(x => `${x.px.toFixed(3)},${x.py.toFixed(3)}`).join("|");
+  };
+  if (run() !== run()) fail("identical runs must reproduce identical ghost behaviour");
+}
+ok("ghosts: delayed reversal at the next tile, deterministic pattern play");
+
 /* ---------- kill screen ---------- */
 {
   const e = new GameEngine(quiet, { startLevel: 255, best: 0, completed: [], seed: 3 });
   if (e.getMaze().totalPellets !== 244) fail("level 256 pellet count");
-  if (e.getMaze().glyph(20, 10) !== " ") fail("level 256: right half was not corrupted");
-  ok("round 256 kill-screen setup");
+  if (e.getMaze().glyph(20, 10) !== maze.glyph(20, 10)) fail("round 256 must keep the real maze logic; only the picture is corrupted");
+  ok("round 256: picture corrupts, gameplay maze stays intact (as in the arcade)");
 }
 
 
