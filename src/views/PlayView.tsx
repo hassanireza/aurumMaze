@@ -29,6 +29,10 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
   const hapticsRef = useRef(progress.haptics);
   hapticsRef.current = progress.haptics;
   const [hud, setHud] = useState<HudSnapshot | null>(null);
+  /** Settings can open before the game starts, so the menu is its own state, not the engine's pause. */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(false);
+  menuRef.current = menuOpen;
 
   sfx.enabled = progress.sound;
 
@@ -43,18 +47,36 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
     []
   );
   const options = useMemo(
-    () => ({ startLevel: level, best: progress.best, completed: progress.completed }),
+    () => ({ startLevel: level, best: progress.best, completed: progress.completed, pace: progress.pace }),
     // Only the starting values matter; the engine owns state after mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [level]
   );
 
+  const openMenu = (): void => {
+    engineRef.current?.pause();
+    setMenuOpen(true);
+  };
+  const closeMenu = (): void => {
+    engineRef.current?.resume();
+    setMenuOpen(false);
+  };
+  const toggleMenuRef = useRef<() => void>(() => undefined);
+  toggleMenuRef.current = () => (menuRef.current || engineRef.current?.getMode() === "paused" ? closeMenu() : openMenu());
+  useEffect(() => {
+    engineRef.current?.setPace(progress.pace);
+  }, [progress.pace]);
+
   useEffect(() => {
     const input = new InputManager(
-      (direction: DirectionName) => engineRef.current?.queueDirection(direction),
-      () => engineRef.current?.togglePause(),
+      (direction: DirectionName) => {
+        if (menuRef.current) return;
+        if (engineRef.current?.getMode() === "playing" || engineRef.current?.getMode() === "ready") haptic("tick", hapticsRef.current);
+        engineRef.current?.queueDirection(direction);
+      },
+      () => toggleMenuRef.current(),
       () => {
-        if (engineRef.current?.getMode() === "ready") engineRef.current.begin();
+        if (!menuRef.current && engineRef.current?.getMode() === "ready") engineRef.current.begin();
       }
     );
     const detachKeys = input.attachKeyboard();
@@ -77,7 +99,7 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
 
   return (
     <div className="play" ref={surfaceRef}>
-      {hud ? <Hud snapshot={hud} onPause={() => engine()?.pause()} onZoom={() => progressStore.setView(progress.camera === "full" ? "close" : progress.camera === "close" ? "closer" : "full")} /> : <header className="hud" />}
+      {hud ? <Hud snapshot={hud} onMenu={() => (menuOpen ? closeMenu() : openMenu())} onZoom={() => progressStore.setView(progress.camera === "full" ? "close" : progress.camera === "close" ? "closer" : "full")} /> : <header className="hud" />}
 
       <div className="play-main">
       <div className="play-board">
@@ -130,15 +152,18 @@ export function PlayView({ level, progress }: PlayViewProps): JSX.Element {
       </div>
       </div>
 
-      {mode === "paused" ? (
+      {menuOpen || mode === "paused" ? (
         <PauseSheet
+          ready={mode === "ready"}
+          pace={progress.pace}
+          onPace={p => progressStore.setPace(p)}
           controls={progress.controls}
           haptics={progress.haptics}
           sound={progress.sound}
           view={progress.camera}
           onView={v => progressStore.setView(v)}
-          onResume={() => engine()?.resume()}
-          onRestart={() => engine()?.restartLevel()}
+          onResume={closeMenu}
+          onRestart={() => { engine()?.restartLevel(); setMenuOpen(false); }}
           onControls={c => progressStore.setControls(c)}
           onHaptics={h => progressStore.setHaptics(h)}
           onSound={s => progressStore.setSound(s)}

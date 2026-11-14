@@ -22,14 +22,15 @@ export function LevelsView({ progress }: { readonly progress: ProgressData }): J
       <header className="screen-head">
         <p className="eyebrow">{progress.completed.length} of {TOTAL_LEVELS - 1} cleared</p>
         <h1>Rounds</h1>
+        <a className="peek" href={playHref(TOTAL_LEVELS - 1)}>Peek at round 256, the kill screen</a>
       </header>
 
       <ul className="level-grid">
         {indices.map(index => {
-          const locked = index > progress.unlocked;
+          const kill = index === TOTAL_LEVELS - 1;
+          const locked = !kill && index > progress.unlocked;
           const done = completed.has(index);
           const current = index === progress.unlocked && !done;
-          const kill = index === TOTAL_LEVELS - 1;
           const cls = `lv${locked ? " lv-locked" : ""}${done ? " lv-done" : ""}${current ? " lv-current" : ""}${kill ? " lv-kill" : ""}`;
           const inner = (
             <>
@@ -47,7 +48,7 @@ export function LevelsView({ progress }: { readonly progress: ProgressData }): J
               {locked ? (
                 <div className={cls} aria-label={`Round ${index + 1}, locked`}>{inner}</div>
               ) : (
-                <a className={cls} href={playHref(index)} aria-label={`Round ${index + 1}${done ? ", cleared" : ""}`}>{inner}</a>
+                <a className={cls} href={playHref(index)} aria-label={kill ? "Round 256, kill screen preview" : `Round ${index + 1}${done ? ", cleared" : ""}`}>{inner}</a>
               )}
             </li>
           );
