@@ -1,3 +1,4 @@
+import { overlayTickedRecently } from "./IosHaptics";
 import type { ControlScheme, HapticKind, ViewMode } from "./types";
 import { TOTAL_LEVELS } from "./levels";
 
@@ -134,7 +135,7 @@ let iosSwitch: HTMLLabelElement | null = null;
  * after a real touch, so it is best effort: it silently does nothing otherwise.
  */
 function iosTap(): void {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || overlayTickedRecently()) return;
   if (!iosSwitch) {
     const label = document.createElement("label");
     label.setAttribute("aria-hidden", "true");
