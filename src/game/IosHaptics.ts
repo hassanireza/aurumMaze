@@ -25,18 +25,36 @@ export function mountIosHaptics(): void {
     document.querySelectorAll<HTMLElement>(HOSTS).forEach(host => {
       if (host.querySelector(":scope > .hx") || host.closest(SKIP)) return;
       if ((host as HTMLButtonElement).disabled || host.getAttribute("aria-disabled") === "true") return;
-      if (getComputedStyle(host).position === "static") host.classList.add("hx-host");
+      // Inline style, not a class: React rewrites className on re-render and would drop a class, leaving
+      // the overlay stretched over a distant ancestor where it steals every tap.
+      if (getComputedStyle(host).position === "static") host.style.position = "relative";
       const sw = document.createElement("input");
       sw.type = "checkbox";
       sw.className = "hx";
       sw.tabIndex = -1;
       sw.setAttribute("switch", "");
       sw.setAttribute("aria-hidden", "true");
+      // Forward the tap to the real control exactly once, whichever event gets there first.
+      let lastForward = 0;
+      const forward = (): void => {
+        const now = Date.now();
+        if (now - lastForward < 400) return;
+        lastForward = now;
+        lastOverlayTick = now;
+        if (!(host as HTMLButtonElement).disabled) host.click();
+      };
+      let from: { x: number; y: number } | null = null;
+      sw.addEventListener("pointerdown", event => { from = { x: event.clientX, y: event.clientY }; });
+      sw.addEventListener("pointercancel", () => { from = null; });
+      sw.addEventListener("pointerup", event => {
+        const start = from;
+        from = null;
+        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 10) forward();
+      });
       sw.addEventListener("click", event => {
         event.preventDefault();
         event.stopPropagation();
-        lastOverlayTick = Date.now();
-        if (!(host as HTMLButtonElement).disabled) host.click();
+        forward();
       });
       host.append(sw);
     });
