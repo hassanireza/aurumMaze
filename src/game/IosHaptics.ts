@@ -15,7 +15,8 @@ let lastOverlayTick = 0;
 export const overlayTickedRecently = (): boolean => Date.now() - lastOverlayTick < 300;
 
 const HOSTS = "button, a[href]";
-const SKIP = "[data-no-hx]";
+// The scrim is a full-screen button behind the sheet: its overlay would sit on top of the sheet and eat every tap.
+const SKIP = "[data-no-hx], .sheet-scrim";
 
 export function mountIosHaptics(): void {
   if (typeof document === "undefined" || !isIOS || typeof navigator.vibrate === "function") return;
@@ -28,6 +29,7 @@ export function mountIosHaptics(): void {
       // Inline style, not a class: React rewrites className on re-render and would drop a class, leaving
       // the overlay stretched over a distant ancestor where it steals every tap.
       if (getComputedStyle(host).position === "static") host.style.position = "relative";
+      host.style.isolation = "isolate"; // keep the overlay inside its own button, never above neighbours
       const sw = document.createElement("input");
       sw.type = "checkbox";
       sw.className = "hx";
