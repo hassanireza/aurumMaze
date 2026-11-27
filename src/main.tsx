@@ -10,7 +10,9 @@ if (!container) {
   throw new Error("Root container not found");
 }
 
-const syncHaptics = (): void => document.documentElement.classList.toggle("haptics-off", !progressStore.getSnapshot().haptics);
+const syncHaptics = (): void => {
+  document.documentElement.classList.toggle("haptics-off", !progressStore.getSnapshot().haptics);
+};
 syncHaptics();
 progressStore.subscribe(syncHaptics);
 
